@@ -11,3 +11,4 @@ apps/api/data/*.db-*
 apps/api/uploads/
 apps/web/dev-dist/
 .turbo/
+apps/api/data/osm/

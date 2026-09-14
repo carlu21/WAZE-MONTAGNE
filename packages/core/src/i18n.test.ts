@@ -69,7 +69,7 @@ describe("fr — contenu", () => {
   it("couvre tous les types de notification et motifs de signalement", () => {
     expect(Object.keys(fr.notifications.types)).toHaveLength(8);
     expect(Object.keys(fr.moderation.reasons)).toHaveLength(6);
-    expect(Object.keys(fr.profilePage.basemaps)).toEqual(["topo", "satellite", "classic", "relief"]);
+    expect(Object.keys(fr.profilePage.basemaps)).toEqual(["topo", "satellite", "classic", "relief", "ortho"]);
   });
   it("aucune chaîne vide ni placeholder", () => {
     const all = leaves(fr);

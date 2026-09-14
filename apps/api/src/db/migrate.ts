@@ -273,6 +273,36 @@ const MIGRATIONS: Migration[] = [
     name: "commune de rattachement des lieux",
     statements: [`ALTER TABLE areas ADD COLUMN commune TEXT`],
   },
+  {
+    version: 3,
+    name: "réseau de chemins (navigation)",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS paths (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        kind TEXT NOT NULL DEFAULT 'path',
+        surface TEXT,
+        sac_scale TEXT,
+        width_m REAL,
+        foot INTEGER NOT NULL DEFAULT 1,
+        bicycle INTEGER NOT NULL DEFAULT 1,
+        horse INTEGER NOT NULL DEFAULT 1,
+        ford INTEGER NOT NULL DEFAULT 0,
+        status TEXT,
+        coordinates TEXT NOT NULL,
+        elevations TEXT,
+        length_m INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'local',
+        min_lat REAL NOT NULL,
+        min_lng REAL NOT NULL,
+        max_lat REAL NOT NULL,
+        max_lng REAL NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS paths_bbox_idx ON paths(min_lat, min_lng)`,
+      `CREATE INDEX IF NOT EXISTS paths_source_idx ON paths(source)`,
+    ],
+  },
 ];
 
 /** Applique toutes les migrations manquantes. Sans effet si la base est à jour. */

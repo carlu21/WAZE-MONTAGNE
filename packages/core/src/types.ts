@@ -3,6 +3,7 @@
  * Ce fichier est LE contrat : toute évolution ici doit être répercutée
  * côté API (schéma / routes) et côté web (client / UI).
  */
+import type { PathSegment } from "./navigation/types";
 
 /** Catégories principales de signalement (section 4 du cahier des charges). */
 export type ReportCategory =
@@ -382,6 +383,8 @@ export interface OfflineBundle {
   trails: Trail[];
   waterPoints: WaterPoint[];
   areas: Area[];
+  /** Réseau de chemins (segments) pour le map matching hors connexion. */
+  paths: PathSegment[];
 }
 
 export interface AdminStats {

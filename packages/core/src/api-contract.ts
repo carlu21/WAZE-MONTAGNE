@@ -139,7 +139,9 @@ export interface AdminUsersResponse {
  *  POST   /notifications/read-all                            -> 204
  *
  * Hors connexion
- *  GET    /offline/bundle?bbox                               -> OfflineBundle
+ *  GET    /paths?bbox                                        -> { paths: PathSegment[], truncated }
+ *  GET    /trails/:id                                        -> { trail: Trail }
+ *  GET    /offline/bundle?bbox                               -> OfflineBundle (avec paths)
  *
  * Communauté
  *  GET    /community/activity                                -> { reports: Report[]; topContributors: UserPublic[]; partners: UserPublic[] }

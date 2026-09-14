@@ -26,6 +26,7 @@ import {
   officialAlerts,
   offlineZones,
   partners,
+  paths,
   photos,
   presencePings,
   reportComments,
@@ -47,6 +48,8 @@ import { addReputationEvent, recomputeUserStanding } from "../services/reputatio
 import { DEFAULT_FILTERS_BY_PRACTICE } from "@mountain-live/core";
 import { defaultPreferences } from "../services/users";
 import { geometryExtent, normalizeText } from "../services/util";
+import { upsertPaths } from "../services/paths";
+import { buildDemoNetwork } from "./demo-network";
 
 /**
  * Jeu de données de démonstration — territoire pilote : la Corse.
@@ -544,10 +547,12 @@ function wipe(): void {
     areas,
   ];
   for (const t of tables) db.delete(t).run();
+  // Le réseau importé (OpenStreetMap) est conservé : seuls les segments de démonstration sont rejoués.
+  db.delete(paths).where(eq(paths.source, "seed")).run();
 }
 
 /** Lieux, sentiers et points d'eau (données de référence, sans compte). */
-export function seedReference(): { areas: number; trails: number; waterPoints: number } {
+export function seedReference(): { areas: number; trails: number; waterPoints: number; paths: number } {
   const now = iso(NOW);
   for (const a of AREAS) {
     const bbox = a.halfKm
@@ -594,7 +599,9 @@ export function seedReference(): { areas: number; trails: number; waterPoints: n
       })
       .run();
   }
-  return { areas: AREAS.length, trails: TRAILS.length, waterPoints: WATER.length };
+  // Réseau de chemins de démonstration (les segments OSM importés, s'il y en a, sont conservés).
+  const network = upsertPaths(buildDemoNetwork(TRAILS));
+  return { areas: AREAS.length, trails: TRAILS.length, waterPoints: WATER.length, paths: network };
 }
 
 function insertUsers(): Map<string, UserRow> {
@@ -852,7 +859,7 @@ export function seedDemo(): { users: number; reports: number; alerts: number } {
 }
 
 /** Réinitialise toutes les données et rejoue le jeu de démonstration complet. */
-export function seedAll(): { areas: number; trails: number; waterPoints: number; users: number; reports: number; alerts: number } {
+export function seedAll(): { areas: number; trails: number; waterPoints: number; paths: number; users: number; reports: number; alerts: number } {
   runMigrations(sqlite);
   return db.transaction(() => {
     wipe();
@@ -892,7 +899,7 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 if (isMain) {
   const result = seedAll();
   console.log(
-    `[seed] Corse : ${result.areas} lieux, ${result.trails} sentiers, ${result.waterPoints} points d'eau, ${result.users} comptes, ${result.reports} signalements, ${result.alerts} alertes officielles.`,
+    `[seed] Corse : ${result.areas} lieux, ${result.trails} sentiers, ${result.paths} segments de chemins, ${result.waterPoints} points d'eau, ${result.users} comptes, ${result.reports} signalements, ${result.alerts} alertes officielles.`,
   );
   console.log(`[seed] Comptes de démo (mot de passe « ${DEMO_PASSWORD} ») :`);
   for (const a of DEMO_ACCOUNTS) console.log(`  - ${a.email.padEnd(34)} ${a.label}`);

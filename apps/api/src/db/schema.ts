@@ -18,6 +18,8 @@ import type {
   UserPreferences,
   UserRole,
   AreaType,
+  PathKind,
+  PathSource,
 } from "@mountain-live/core";
 
 /**
@@ -246,6 +248,38 @@ export const trails = sqliteTable(
   (t) => [index("trails_bbox_idx").on(t.minLat, t.minLng)],
 );
 
+/**
+ * Réseau de chemins (module navigation) : un segment = une arête du graphe,
+ * nœuds aux extrémités (les intersections sont des extrémités partagées).
+ */
+export const paths = sqliteTable(
+  "paths",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    kind: text("kind").$type<PathKind>().notNull(),
+    surface: text("surface"),
+    sacScale: text("sac_scale"),
+    widthM: real("width_m"),
+    foot: integer("foot", { mode: "boolean" }).notNull().default(true),
+    bicycle: integer("bicycle", { mode: "boolean" }).notNull().default(true),
+    horse: integer("horse", { mode: "boolean" }).notNull().default(true),
+    ford: integer("ford", { mode: "boolean" }).notNull().default(false),
+    status: text("status").$type<"open" | "closed" | null>(),
+    /** `[lng, lat][]` */
+    coordinates: text("coordinates", { mode: "json" }).$type<[number, number][]>().notNull(),
+    elevations: text("elevations", { mode: "json" }).$type<number[] | null>(),
+    lengthM: integer("length_m").notNull(),
+    source: text("source").$type<PathSource>().notNull(),
+    minLat: real("min_lat").notNull(),
+    minLng: real("min_lng").notNull(),
+    maxLat: real("max_lat").notNull(),
+    maxLng: real("max_lng").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("paths_bbox_idx").on(t.minLat, t.minLng), index("paths_source_idx").on(t.source)],
+);
+
 export const waterPoints = sqliteTable(
   "water_points",
   {
@@ -400,6 +434,7 @@ export type CommentRow = typeof reportComments.$inferSelect;
 export type PhotoRow = typeof photos.$inferSelect;
 export type OfficialAlertRow = typeof officialAlerts.$inferSelect;
 export type TrailRow = typeof trails.$inferSelect;
+export type PathRow = typeof paths.$inferSelect;
 export type WaterPointRow = typeof waterPoints.$inferSelect;
 export type AreaRow = typeof areas.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

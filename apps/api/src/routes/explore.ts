@@ -12,10 +12,11 @@ import {
 } from "@mountain-live/core";
 import { z } from "zod";
 import { db } from "../db/client";
-import { areas } from "../db/schema";
+import { areas, trails } from "../db/schema";
 import { optionalAuth, type AppEnv } from "../middleware/auth";
 import { readQuery } from "../middleware/validate";
 import { areaBBox, searchAreasWithFallback } from "../services/areas";
+import { listPathsInBBox, toPathSegment } from "../services/paths";
 import { HttpError } from "../services/errors";
 import { presenceEstimateInBBox } from "../services/presence";
 import { listOfficialAlerts, listTrailsInBBox, listWaterPointsInBBox, waterPointsAround } from "../services/reference";
@@ -92,6 +93,23 @@ exploreRoutes.get("/areas/:id", optionalAuth, (c) => {
 exploreRoutes.get("/trails", (c) => {
   const { bbox } = readQuery(c, bboxQuerySchema);
   return c.json({ trails: listTrailsInBBox(bbox).map(toTrail) });
+});
+
+exploreRoutes.get("/trails/:id", (c) => {
+  const row = db.select().from(trails).where(eq(trails.id, c.req.param("id"))).get();
+  if (!row) throw new HttpError(404, "not_found", "Itinéraire introuvable");
+  return c.json({ trail: toTrail(row) });
+});
+
+/**
+ * Réseau de chemins (navigation) : segments dont l'emprise croise la bbox
+ * (au plus 5 000, soit largement une zone de 10 × 10 km en montagne).
+ */
+exploreRoutes.get("/paths", (c) => {
+  const { bbox } = readQuery(c, bboxQuerySchema);
+  const rows = listPathsInBBox(bbox, 5000);
+  c.header("Cache-Control", "public, max-age=300");
+  return c.json({ paths: rows.map(toPathSegment), truncated: rows.length >= 5000 });
 });
 
 exploreRoutes.get("/water-points", (c) => {
