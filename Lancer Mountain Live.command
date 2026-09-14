@@ -27,12 +27,16 @@ echo "Node.js $(node -v) : OK"
 
 # 2. pnpm (via corepack, fourni avec Node : aucune installation globale nécessaire)
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-if command -v pnpm >/dev/null 2>&1; then
-  PNPM="pnpm"
-else
-  PNPM="corepack pnpm"
+if ! command -v pnpm >/dev/null 2>&1; then
+  # Les scripts du projet appellent « pnpm » par son nom : on le rend disponible le temps de la session.
+  SHIM_DIR="$(mktemp -d 2>/dev/null || echo "/tmp/mountain-live-shim-$$")"
+  mkdir -p "$SHIM_DIR"
+  printf '#!/bin/sh\nexec corepack pnpm "$@"\n' > "$SHIM_DIR/pnpm"
+  chmod +x "$SHIM_DIR/pnpm"
+  export PATH="$SHIM_DIR:$PATH"
 fi
-echo "pnpm : $($PNPM --version 2>/dev/null || echo 'via corepack')"
+PNPM="pnpm"
+echo "pnpm : $($PNPM --version 2>/dev/null || echo 'indisponible')"
 
 # 3. Dépendances (premier lancement ou mise à jour)
 if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.modules.yaml ]; then
@@ -40,8 +44,13 @@ if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.modules.yaml ]; t
   $PNPM install || fail "L'installation des dépendances a échoué."
 fi
 
-# 4. Base de données de démonstration (créée seulement si absente : vos données sont conservées)
-if [ ! -f apps/api/data/mountain-live.db ]; then
+# 4. Base de données de démonstration : créée si absente ou vide (vos données sont conservées sinon)
+DB_FILE="apps/api/data/mountain-live.db"
+USERS_COUNT=0
+if [ -f "$DB_FILE" ]; then
+  USERS_COUNT=$(node -e "try{const D=require('./apps/api/node_modules/better-sqlite3');const db=new D(process.argv[1],{readonly:true});console.log(db.prepare('select count(*) as n from users').get().n)}catch(e){console.log(0)}" "$DB_FILE" 2>/dev/null || echo 0)
+fi
+if [ "${USERS_COUNT:-0}" -eq 0 ]; then
   bold "Création de la base de données et du jeu de données Corse…"
   $PNPM --filter @mountain-live/api db:reset || fail "La création de la base a échoué."
 fi
