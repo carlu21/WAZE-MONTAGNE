@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MaplibreMap, type StyleSpecification } from "maplibre-gl";
-import type { Feature } from "geojson";
+import type { Feature } from "@/components/map/geojsonTypes";
 import type { GeoJsonGeometry } from "@mountain-live/core";
 import { Button, Segmented } from "@/components/ui";
 
