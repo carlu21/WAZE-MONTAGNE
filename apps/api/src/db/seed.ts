@@ -81,6 +81,7 @@ interface AreaSeed {
 const AREAS: AreaSeed[] = [
   // Communes
   { id: "a_corte", name: "Corte", type: "commune", lat: 42.3061, lng: 9.1497, elevation: 400, halfKm: 6, description: "Cité historique au cœur de la Corse, porte des gorges de la Restonica et du Tavignano." },
+  { id: "a_restonica", name: "Vallée de la Restonica", type: "place", lat: 42.2528, lng: 9.0925, elevation: 900, halfKm: 6, description: "Gorges et vallée glaciaire au-dessus de Corte : accès aux bergeries de Grotelle et aux lacs de Melo et de Capitello." },
   { id: "a_calenzana", name: "Calenzana", type: "commune", lat: 42.5083, lng: 8.8567, elevation: 275, halfKm: 5, description: "Point de départ du GR20 et du Mare e Monti, en Balagne." },
   { id: "a_vizzavona", name: "Vizzavona", type: "commune", lat: 42.1275, lng: 9.1339, elevation: 920, halfKm: 4, description: "Hameau forestier à mi-parcours du GR20, au pied du Monte d'Oro." },
   { id: "a_zonza", name: "Zonza", type: "commune", lat: 41.7519, lng: 9.1697, elevation: 780, halfKm: 6, description: "Village de l'Alta Rocca, accès au col et aux aiguilles de Bavella." },

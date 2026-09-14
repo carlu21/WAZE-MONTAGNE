@@ -80,18 +80,35 @@ export default function MapPage() {
     [officialAlerts, selectedAlertId],
   );
 
-  const flyTo = useCallback((center: { lat: number; lng: number }, targetZoom: number) => {
-    const map = mapRef.current;
-    if (!map || !isMapAlive(map)) return;
-    map.flyTo({ center: [center.lng, center.lat], zoom: targetZoom, duration: 900, essential: true });
+  /**
+   * Mouvement de caméra fiable : avant l'événement « load » (style chargé mais première
+   * image non rendue), MapLibre ignore les animations ; on saute alors directement à la vue.
+   */
+  const moveCamera = useCallback((map: MaplibreMap, center: { lat: number; lng: number }, targetZoom: number, animate: boolean) => {
+    const go = () => {
+      if (!isMapAlive(map)) return;
+      if (animate) map.flyTo({ center: [center.lng, center.lat], zoom: targetZoom, duration: 900, essential: true });
+      else map.jumpTo({ center: [center.lng, center.lat], zoom: targetZoom });
+    };
+    if (map.loaded()) go();
+    else map.once("load", () => window.setTimeout(go, 0));
   }, []);
+
+  const flyTo = useCallback(
+    (center: { lat: number; lng: number }, targetZoom: number) => {
+      const map = mapRef.current;
+      if (!map || !isMapAlive(map)) return;
+      moveCamera(map, center, targetZoom, true);
+    },
+    [moveCamera],
+  );
 
   const onReady = useCallback(
     (map: MaplibreMap) => {
       mapRef.current = map;
       // Recentrage demandé par l'assistant de signalement (publication ou mise en attente).
       if (navState?.focus) {
-        map.jumpTo({ center: [navState.focus.lng, navState.focus.lat], zoom: FOCUS_ZOOM });
+        moveCamera(map, navState.focus, FOCUS_ZOOM, false);
         firstLocateDone.current = true;
         // L'état de navigation ne doit pas être rejoué à la prochaine visite.
         navigate(location.pathname, { replace: true, state: null });
@@ -100,7 +117,7 @@ export default function MapPage() {
       // Premier chargement avec une position connue : la carte se centre sur l'utilisateur (section 33).
       if (!firstLocateDone.current && position && Date.now() - position.at < 10 * 60_000) {
         firstLocateDone.current = true;
-        map.flyTo({ center: [position.lng, position.lat], zoom: FIRST_LOCATE_ZOOM, duration: 1200, essential: true });
+        moveCamera(map, position, FIRST_LOCATE_ZOOM, false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
