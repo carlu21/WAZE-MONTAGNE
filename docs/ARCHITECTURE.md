@@ -143,6 +143,10 @@ sequenceDiagram
 
 `AlertsWatcher` (monté une fois) : à chaque déplacement de plus de 50 m ou toutes les 20 s, `computeAlerts` compare la position aux signalements connus (caches TanStack + Dexie) dans le rayon et les catégories des préférences ; regroupe troupeau + chiens de protection ; les alertes officielles priment ; chaque alerte n'est émise qu'une fois par 6 h ; toast persistant avec « Voir », vibration, notification système si l'onglet est masqué. Toutes les 5 minutes au plus, `POST /presence` envoie la position : le serveur ne stocke que la **cellule ≈1 km** et une tranche de 5 minutes, sans identifiant, purgée après 30 minutes ; `GET /presence?bbox` alimente la carte thermique et « Environ N utilisateurs actifs ».
 
+### Navigation GPS sur les sentiers
+
+`packages/core/src/navigation` (moteur pur : graphe, map matching multi-hypothèses, progression, sortie d'itinéraire, instructions, événements devant soi, trace, GPX, ETA) → `apps/web/src/features/navigation` (sources de position GPS / simulation / externe, chargement du réseau par cellules avec cache IndexedDB, moteur temps réel monté une fois dans `App`, écran `/navigate`). Le réseau de chemins vient de la table `paths` (`GET /paths?bbox`, bundle hors connexion), alimentée par le réseau de démonstration et l'import OpenStreetMap. Détails : [NAVIGATION_GPS.md](NAVIGATION_GPS.md).
+
 ### Hors connexion
 
 Trois mécanismes complémentaires :

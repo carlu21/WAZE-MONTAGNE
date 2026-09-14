@@ -5,7 +5,7 @@
  * selon la distance et la gravité.
  */
 import { SUBTYPE_BY_ID } from "../taxonomy";
-import type { LatLng, OfficialAlert, Report, ReportSubtype, WaterPoint } from "../types";
+import type { LatLng, OfficialAlert, Report, ReportCategory, ReportSubtype, WaterPoint } from "../types";
 import { bearing, formatDistance, haversineM } from "../geo";
 import { fr, interpolate } from "../i18n";
 import { headingDiff, pointInRing, projectOnPolyline } from "./geometry";
@@ -27,6 +27,8 @@ export interface RouteEvent {
   reportId?: string;
   alertId?: string;
   subtype?: ReportSubtype;
+  /** Catégorie (icône / couleur du marqueur). */
+  category?: ReportCategory;
   /** Position floutée (espèce sensible) : distance approximative. */
   approximate?: boolean;
 }
@@ -88,7 +90,7 @@ export function collectRouteEvents(route: NavRoute, input: CollectEventsInput): 
     if (!proj) continue;
     const limit = r.blurred ? 450 : corridor;
     if (proj.distanceM > limit) continue;
-    out.push({ key: `report:${r.id}`, kind: "report", along: proj.along, position: proj.snapped, label: reportLabel(r), severity: reportSeverity(r), lateralM: Math.round(proj.distanceM), reportId: r.id, subtype: r.subtype, approximate: r.blurred || undefined });
+    out.push({ key: `report:${r.id}`, kind: "report", along: proj.along, position: proj.snapped, label: reportLabel(r), severity: reportSeverity(r), lateralM: Math.round(proj.distanceM), reportId: r.id, subtype: r.subtype, category: r.category, approximate: r.blurred || undefined });
   }
 
   for (const a of input.officialAlerts ?? []) {
@@ -117,14 +119,14 @@ export function collectRouteEvents(route: NavRoute, input: CollectEventsInput): 
       position = proj.snapped;
       lateral = Math.round(proj.distanceM);
     }
-    out.push({ key: `alert:${a.id}`, kind: "official", along, position: position!, label: a.title, severity: alertSeverity(a), lateralM: lateral, alertId: a.id });
+    out.push({ key: `alert:${a.id}`, kind: "official", along, position: position!, label: a.title, severity: alertSeverity(a), lateralM: lateral, alertId: a.id, category: a.category });
   }
 
   for (const w of input.waterPoints ?? []) {
     const proj = projectOnPolyline(w, line, cum);
     if (!proj || proj.distanceM > 60) continue;
     const label = w.lastState === "dry" ? `${w.name} (signalée sèche)` : w.name;
-    out.push({ key: `water:${w.id}`, kind: "water", along: proj.along, position: proj.snapped, label, severity: "low", lateralM: Math.round(proj.distanceM) });
+    out.push({ key: `water:${w.id}`, kind: "water", along: proj.along, position: proj.snapped, label, severity: "low", lateralM: Math.round(proj.distanceM), category: "water" });
   }
 
   for (const seg of input.segments ?? []) {
@@ -132,8 +134,8 @@ export function collectRouteEvents(route: NavRoute, input: CollectEventsInput): 
     const mid = seg.coordinates[Math.floor(seg.coordinates.length / 2)];
     const proj = projectOnPolyline({ lng: mid[0], lat: mid[1] }, line, cum);
     if (!proj || proj.distanceM > 30) continue;
-    if (seg.ford) out.push({ key: `ford:${seg.id}`, kind: "ford", along: proj.along, position: proj.snapped, label: fr.navigation.events.ford, severity: "medium", lateralM: Math.round(proj.distanceM) });
-    if (seg.status === "closed") out.push({ key: `closed:${seg.id}`, kind: "closed", along: proj.along, position: proj.snapped, label: fr.navigation.events.closed, severity: "high", lateralM: Math.round(proj.distanceM) });
+    if (seg.ford) out.push({ key: `ford:${seg.id}`, kind: "ford", along: proj.along, position: proj.snapped, label: fr.navigation.events.ford, severity: "medium", lateralM: Math.round(proj.distanceM), category: "path" });
+    if (seg.status === "closed") out.push({ key: `closed:${seg.id}`, kind: "closed", along: proj.along, position: proj.snapped, label: fr.navigation.events.closed, severity: "high", lateralM: Math.round(proj.distanceM), category: "path" });
   }
 
   if (route.elevations) {
@@ -148,7 +150,7 @@ export function collectRouteEvents(route: NavRoute, input: CollectEventsInput): 
       if (e1 === null || run < STEEP_WINDOW_M * 0.5) continue;
       const grade = (Math.abs(e1 - e0) / run) * 100;
       if (grade >= STEEP_GRADE && cum[i] > lastSteepEnd) {
-        out.push({ key: `slope:${i}`, kind: "slope", along: cum[i], position: { lng: line[i][0], lat: line[i][1] }, label: fr.navigation.events.slope, severity: "medium", lateralM: 0 });
+        out.push({ key: `slope:${i}`, kind: "slope", along: cum[i], position: { lng: line[i][0], lat: line[i][1] }, label: fr.navigation.events.slope, severity: "medium", lateralM: 0, category: "danger" });
         lastSteepEnd = cum[j] + 200;
       }
     }
@@ -199,7 +201,7 @@ export function collectFreeEvents(position: LatLng, heading: number | null, inpu
     if (!isReportCurrent(r, now)) continue;
     const d = haversineM(position, r);
     if (d > radius || !ahead(r, d)) continue;
-    out.push({ key: `report:${r.id}`, kind: "report", along: d, position: { lat: r.lat, lng: r.lng }, label: reportLabel(r), severity: reportSeverity(r), lateralM: 0, reportId: r.id, subtype: r.subtype, approximate: r.blurred || undefined });
+    out.push({ key: `report:${r.id}`, kind: "report", along: d, position: { lat: r.lat, lng: r.lng }, label: reportLabel(r), severity: reportSeverity(r), lateralM: 0, reportId: r.id, subtype: r.subtype, category: r.category, approximate: r.blurred || undefined });
   }
   for (const a of input.officialAlerts ?? []) {
     if (a.endsAt && new Date(a.endsAt).getTime() <= now) continue;
@@ -207,12 +209,12 @@ export function collectFreeEvents(position: LatLng, heading: number | null, inpu
     const inside = a.geometry.type === "Polygon" && a.geometry.coordinates[0] ? pointInRing(position, a.geometry.coordinates[0]) : false;
     const d = inside ? 0 : haversineM(position, c);
     if (d > radius * 2 || (!inside && !ahead(c, d))) continue;
-    out.push({ key: `alert:${a.id}`, kind: "official", along: d, position: c, label: a.title, severity: alertSeverity(a), lateralM: 0, alertId: a.id });
+    out.push({ key: `alert:${a.id}`, kind: "official", along: d, position: c, label: a.title, severity: alertSeverity(a), lateralM: 0, alertId: a.id, category: a.category });
   }
   for (const w of input.waterPoints ?? []) {
     const d = haversineM(position, w);
     if (d > Math.min(radius, 400) || !ahead(w, d)) continue;
-    out.push({ key: `water:${w.id}`, kind: "water", along: d, position: { lat: w.lat, lng: w.lng }, label: w.lastState === "dry" ? `${w.name} (signalée sèche)` : w.name, severity: "low", lateralM: 0 });
+    out.push({ key: `water:${w.id}`, kind: "water", along: d, position: { lat: w.lat, lng: w.lng }, label: w.lastState === "dry" ? `${w.name} (signalée sèche)` : w.name, severity: "low", lateralM: 0, category: "water" });
   }
   return out.sort((a, b) => a.along - b.along);
 }

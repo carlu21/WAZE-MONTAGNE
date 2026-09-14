@@ -16,6 +16,12 @@
 | Gants / soleil / pluie | cibles ≥ 48 px (56–64 px pour les actions principales), contraste AA, texte 16–17 px, une main, mode sombre |
 | Réseau faible | cache network-first de l'API, zones hors connexion, file d'attente des actions |
 
+## Navigation GPS
+
+- La navigation utilise `watchPosition` en haute précision ; sur iOS, la boussole demande une autorisation explicite (déclenchée au « Démarrer »). Gardez l'écran allumé pendant l'activité : les navigateurs suspendent la géolocalisation en arrière-plan (l'application native lèvera cette limite avec un service de localisation en arrière-plan et le baromètre).
+- Le guidage vocal repose sur la synthèse vocale du système (voix française) ; les alertes importantes vibrent.
+- Avant de partir, téléchargez la zone (Profil → Hors connexion) : elle embarque désormais le réseau de chemins pour le map matching sans réseau.
+
 ## Passer en application native avec Capacitor
 
 Le code web est réutilisé tel quel ; Capacitor l'emballe dans une WebView native et expose les API système.

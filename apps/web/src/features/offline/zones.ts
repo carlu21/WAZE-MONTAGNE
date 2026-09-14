@@ -91,6 +91,7 @@ export async function downloadZone(
     trails: bundle.trails,
     waterPoints: bundle.waterPoints,
     areas: bundle.areas,
+    paths: bundle.paths ?? [],
   };
   await db.zones.put(zone);
   onProgress({ done: urls.length, total: urls.length, failed, phase: "finished" });

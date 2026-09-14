@@ -16,6 +16,7 @@
 | `/profile`, `/profile/preferences`, `/profile/settings` | Profil, préférences, paramètres | oui | compte |
 | `/notifications` | Notifications | oui | compte |
 | `/offline` | Zones hors connexion | oui | libre |
+| `/navigate` | **Navigation GPS sur les sentiers** (préparation, suivi plein écran, résumé) — voir [NAVIGATION_GPS.md](NAVIGATION_GPS.md) | non (plein écran) | libre (le signalement depuis l'écran demande un compte) |
 | `/report`, `/report/:step` | Assistant de signalement (category, subtype, details, done) | non (plein écran) | compte |
 | `/flag/:reportId` | Signalement d'un contenu | non | compte |
 | `/admin/*` | Back-office (tableau de bord, signalements, litiges, utilisateurs, alertes) | non | moderator, admin |
@@ -43,6 +44,14 @@ Cinq gestes, moins de 20 secondes. Hors réseau, le signalement est mis en atten
 2. La position est connue : la carte se centre (zoom 13).
 3. En moins de cinq secondes : les icônes colorées (rouge = danger, brun = animaux, bleu = eau, orange = activité…), les zones d'alerte officielle, le compteur « N signalements dans la vue » et l'estimation de fréquentation.
 4. Un tap sur une icône ouvre l'aperçu (feuille basse) : libellé, niveau, source, confiance, « Signalé il y a 35 min », « Confirmé par 8 utilisateurs », boutons « Toujours présent » / « Plus présent », « Voir la fiche ».
+
+## Parcours de navigation (module GPS)
+
+1. Carte → bouton « Navigation » (ou fiche de secteur → « Démarrer » sur un sentier).
+2. Préparation : activité, mode libre ou itinéraire (sentiers à proximité, GPX importé, trace enregistrée), précision du suivi, guidage vocal ; « Démarrer ».
+3. Suivi : la carte se centre et suit ; le marqueur est rattaché au chemin ; instruction en haut (« Continuez sur ce sentier pendant 1,2 km », « Prenez le sentier à droite »), alertes devant soi par palier (« Attention : Battue dans 800 m »), barre de statistiques en bas ; « + » pour signaler sans interrompre le suivi ; « Revenir sur mes pas ».
+4. Sortie d'itinéraire : « Vous semblez avoir quitté l'itinéraire. » → « Revenir au parcours » (ligne et consigne vers le point le plus proche) ou « Continuer en mode libre ».
+5. Terminer → résumé (distance, durée, dénivelés, altitude max, vitesse) → enregistrer la trace / exporter en GPX.
 
 ## États particuliers
 

@@ -37,6 +37,7 @@ erDiagram
 | `photos` | photos des signalements | `url` relative `/uploads/…`, dimensions, `deleted_at` |
 | `official_alerts` | alertes officielles | `organisation`, `title`, `body`, `category`, `severity`, `geometry` (GeoJSON Point/Polygon), `centroid_lat/lng`, `starts_at`, `ends_at`, `url` |
 | `trails` | sentiers de référence | `type`, `difficulty`, `distance_km`, `elevation_gain_m`, `geometry` (LineString) |
+| `paths` | **réseau de chemins** (navigation, map matching) : un segment = une arête, intersections aux extrémités | `kind` (path, track, footway, bridleway, cycleway, steps, road, via_ferrata), `name`, `surface`, `sac_scale`, `width_m`, `foot` / `bicycle` / `horse`, `ford`, `status` (open / closed), `coordinates` (JSON `[lng, lat][]`), `elevations`, `length_m`, `source` (osm, ign, seed, gpx, local), emprise `min/max_lat/lng`. Identifiants : `d_…` réseau de démonstration, `osm_<way>[_n]` import OpenStreetMap (`geo:import-osm`) |
 | `water_points` | sources, fontaines, lacs, refuges, abris | `type`, `last_state` (active, dry, unknown), `last_state_at`, `elevation` |
 | `areas` | lieux recherchables | `type` (commune, massif, trail, summit, pass, place, refuge, lake, hamlet, spring), `lat/lng`, `bbox`, `elevation`, `description`, `commune` (commune de rattachement, pour distinguer les homonymes). Identifiants : `a_…` jeu de démonstration, `gn_<geonameid>` import GeoNames (`geo:import`), `g_…` lieux mémorisés depuis le géocodeur IGN |
 | `offline_zones` | zones téléchargées par un utilisateur (métadonnées) | `bbox`, `downloaded_at` |

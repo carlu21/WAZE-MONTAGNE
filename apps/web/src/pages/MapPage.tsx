@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Info, List } from "lucide-react";
+import { Info, List, Navigation2 } from "lucide-react";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { fr, inBBox, phrases, type Area, type BBox, type OfficialAlert, type Report } from "@mountain-live/core";
 import { IconButton } from "@/components/ui";
@@ -236,6 +236,13 @@ export default function MapPage() {
             {phrases.activeUsers(activeUsers)}
           </div>
         ) : null}
+      </div>
+
+      {/* Navigation GPS sur les sentiers (écran plein écran) */}
+      <div className="absolute right-3 z-[var(--z-overlay)]" style={{ bottom: "calc(var(--safe-bottom) + 72px)" }}>
+        <IconButton aria-label={fr.navigation.title} title={fr.navigation.title} variant="glass" size={52} shape="round" onClick={() => navigate("/navigate")} data-testid="map-navigate">
+          <Navigation2 className="text-primary" />
+        </IconButton>
       </div>
 
       {/* Légende repliable (icônes, couleurs, ancienneté) */}

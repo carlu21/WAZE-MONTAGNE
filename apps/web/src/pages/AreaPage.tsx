@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Download, MapPin, Users } from "lucide-react";
 import { CATEGORIES, SUBTYPE_BY_ID, formatUntil, fr, phrases, type Report, type Trail } from "@mountain-live/core";
-import { Badge, Button, CategoryIcon, ConfidenceBadge, DangerPill, EmptyState, IconButton, ListItem, RelativeTime, SkeletonText, SourceBadge, TopBar } from "@/components/ui";
+import { Badge, Button, CategoryIcon, ConfidenceBadge, DangerPill, EmptyState, IconButton, ListItem, RelativeTime, SkeletonText, SourceBadge, TopBar, LinkButton } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { formatElevation } from "@/lib/format";
@@ -181,6 +181,13 @@ export default function AreaPage() {
                 icon={<CategoryIcon name={AREA_TYPE_ICONS.trail} />}
                 title={t.name}
                 subtitle={`${TRAIL_TYPE[t.type]} · ${t.distanceKm.toLocaleString("fr-FR")} km · +${t.elevationGainM} m · ${DIFFICULTY[t.difficulty]}`}
+                trailing={
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <LinkButton to={`/navigate?trail=${encodeURIComponent(t.id)}`} variant="primary" size="md" aria-label={`${fr.navigation.start} : ${t.name}`}>
+                      {fr.navigation.start}
+                    </LinkButton>
+                  </span>
+                }
                 onClick={() => {
                   const first = t.geometry.type === "LineString" ? t.geometry.coordinates[Math.floor(t.geometry.coordinates.length / 2)] : null;
                   if (first) {

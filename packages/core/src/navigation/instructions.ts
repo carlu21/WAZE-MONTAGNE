@@ -130,6 +130,8 @@ export interface Instruction {
 export const NOW_DISTANCE_M = 25;
 /** Distance (m) au-delà de laquelle on annonce « Continuez sur ce sentier pendant … ». */
 export const FAR_DISTANCE_M = 150;
+/** Distance (m) au-delà de laquelle l'arrivée n'est pas encore annoncée. */
+export const ARRIVAL_FAR_M = 300;
 
 function dirLabel(type: ManeuverType): string {
   return type.endsWith("left") ? fr.navigation.instructions.left : fr.navigation.instructions.right;
@@ -180,7 +182,7 @@ export function currentInstruction(maneuvers: readonly Maneuver[], along: number
   if (!next) return null;
   const distanceM = Math.max(0, Math.round(next.along - along));
   const step = announcementStep(distanceM);
-  if (next.type !== "arrive" && distanceM > FAR_DISTANCE_M) {
+  if ((next.type !== "arrive" && distanceM > FAR_DISTANCE_M) || (next.type === "arrive" && distanceM > ARRIVAL_FAR_M)) {
     return { text: interpolate(fr.navigation.instructions.continueFor, { distance: formatDistance(distanceM) }), distanceM, type: "straight", key: `far:${Math.round(next.along)}`, maneuver: next };
   }
   return { text: maneuverText(next, distanceM), distanceM, type: next.type, key: `${Math.round(next.along)}:${next.type}:${step}`, maneuver: next };

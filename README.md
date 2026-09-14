@@ -10,7 +10,7 @@ Les applications classiques répondent à « Où puis-je aller ? ». Mountain Li
 
 ## Démarrage rapide
 
-**Sur Mac, sans ligne de commande** : double-cliquez sur `Lancer Mountain Live.command` dans le Finder. Le Terminal s'ouvre, installe ce qu'il faut au premier lancement (Node.js 20+ doit être installé : [nodejs.org](https://nodejs.org/fr/download)), démarre l'application et ouvre le navigateur. `Reinitialiser les donnees.command` remet le jeu de données de démonstration à zéro. Si macOS refuse d'ouvrir le fichier, clic droit → Ouvrir, ou dans le Terminal : `chmod +x *.command`.
+**Sur Mac, sans ligne de commande** : double-cliquez sur `Lancer Mountain Live.command` dans le Finder. Le Terminal s'ouvre, installe ce qu'il faut au premier lancement (Node.js 20+ doit être installé : [nodejs.org](https://nodejs.org/fr/download)), démarre l'application et ouvre le navigateur. `Reinitialiser les donnees.command` remet le jeu de données de démonstration à zéro ; `Importer les lieux-dits (GeoNames).command` et `Importer les sentiers (OpenStreetMap).command` enrichissent la base (lieux-dits, réseau de sentiers). Si macOS refuse d'ouvrir le fichier, clic droit → Ouvrir, ou dans le Terminal : `chmod +x *.command`.
 
 Prérequis en ligne de commande : Node.js ≥ 20 et pnpm 10 (`corepack enable`).
 
@@ -50,6 +50,24 @@ La recherche (barre de la carte, page Explorer) combine trois sources :
    ```
 
 3. le **géocodeur en ligne de l'IGN** (Géoplateforme, index « poi » et communes) en repli quand la base répond peu : tout lieu-dit de France devient trouvable dès qu'il y a du réseau, et les résultats sont mémorisés en base (identifiants `g_…`) pour les fiches et les recherches suivantes. Désactivable avec `GEOCODER_DISABLED=1`, service remplaçable avec `GEOCODER_URL`.
+
+
+## Navigation GPS sur les sentiers
+
+Le module de navigation (« Waze de la montagne ») suit la position GPS, la **rattache au chemin le plus probable** (map matching sur le réseau de sentiers), guide pas à pas sur un itinéraire (sentier de la base, trace GPX importée ou trace enregistrée), détecte les sorties de parcours, enregistre un fil d'Ariane et annonce les **signalements situés devant vous** par paliers de distance. Écran `/navigate` (bouton « Navigation » sur la carte, entrée dans Explorer, « Démarrer » sur un sentier d'une fiche de secteur).
+
+- Sur ordinateur, activez « Simuler ce parcours (démo) » à la préparation, ou ouvrez directement `http://localhost:5173/navigate?trail=t_restonica_melo&simulate=1&autostart=1`.
+- Le jeu de démonstration contient un réseau de sentiers densifié ; pour le vrai réseau, importez OpenStreetMap (licence ODbL) :
+
+   ```bash
+   pnpm --filter @mountain-live/api geo:import-osm                              # Corse (Overpass)
+   pnpm --filter @mountain-live/api geo:import-osm -- --bbox 8.9,42.1,9.2,42.4  # une zone
+   pnpm --filter @mountain-live/api geo:import-osm -- --file export.geojson     # fichier (Overpass Turbo, QGIS…)
+   ```
+
+   ou double-cliquez sur `Importer les sentiers (OpenStreetMap).command`.
+
+Détails (algorithme, seuils, données, Bluetooth) : [docs/NAVIGATION_GPS.md](docs/NAVIGATION_GPS.md).
 
 ## Ce que fait le MVP
 

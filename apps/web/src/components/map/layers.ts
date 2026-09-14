@@ -24,6 +24,18 @@ export const LAYER_IDS = {
   userDotHalo: "ml-user-dot-halo",
   userDot: "ml-user-dot",
   searchMarker: "ml-search-marker",
+  // Navigation (écran plein écran) : réseau, itinéraire, trace, événements, marqueur orienté.
+  navPaths: "ml-nav-paths",
+  navPathsCasing: "ml-nav-paths-casing",
+  navRouteCasing: "ml-nav-route-casing",
+  navRouteRemaining: "ml-nav-route-remaining",
+  navRouteDone: "ml-nav-route-done",
+  navTrack: "ml-nav-track",
+  navReturn: "ml-nav-return",
+  navEvents: "ml-nav-events",
+  navAccuracy: "ml-nav-accuracy",
+  navMarkerHalo: "ml-nav-marker-halo",
+  navMarker: "ml-nav-marker",
 } as const;
 
 export const SOURCE_IDS = {
@@ -34,13 +46,26 @@ export const SOURCE_IDS = {
   selected: "ml-selected",
   user: "ml-user",
   search: "ml-search",
+  navPaths: "ml-nav-paths",
+  navRoute: "ml-nav-route",
+  navTrack: "ml-nav-track",
+  navReturn: "ml-nav-return",
+  navEvents: "ml-nav-events",
+  navUser: "ml-nav-user",
 } as const;
 
 /** Du plus bas (dessous) au plus haut (dessus). */
 export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.presenceHeat,
+  LAYER_IDS.navPathsCasing,
+  LAYER_IDS.navPaths,
   LAYER_IDS.alertsFill,
   LAYER_IDS.alertsOutline,
+  LAYER_IDS.navRouteCasing,
+  LAYER_IDS.navRouteRemaining,
+  LAYER_IDS.navRouteDone,
+  LAYER_IDS.navTrack,
+  LAYER_IDS.navReturn,
   LAYER_IDS.reportsBlur,
   LAYER_IDS.reportsClusters,
   LAYER_IDS.reportsClusterCount,
@@ -52,6 +77,10 @@ export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.userDotHalo,
   LAYER_IDS.userDot,
   LAYER_IDS.searchMarker,
+  LAYER_IDS.navEvents,
+  LAYER_IDS.navAccuracy,
+  LAYER_IDS.navMarkerHalo,
+  LAYER_IDS.navMarker,
 ];
 
 /** Identifiant de la première couche déjà présente devant se trouver au-dessus de `layerId`. */

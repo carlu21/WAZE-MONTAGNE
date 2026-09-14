@@ -28,6 +28,7 @@ const FlagContentPage = lazy(() => import("./pages/FlagContentPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const ProDashboardPage = lazy(() => import("./pages/ProDashboardPage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
+const NavigationPage = lazy(() => import("./pages/NavigationPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function S({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
     ],
   },
   // Écrans plein écran (sans barre de navigation)
+  { path: "/navigate", element: <S><NavigationPage /></S> },
   { path: "/report", element: <S><RequireAuth><ReportWizardPage /></RequireAuth></S> },
   { path: "/report/:step", element: <S><RequireAuth><ReportWizardPage /></RequireAuth></S> },
   { path: "/flag/:reportId", element: <S><RequireAuth><FlagContentPage /></RequireAuth></S> },

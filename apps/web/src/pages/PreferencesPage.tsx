@@ -10,6 +10,7 @@ import { Button, Chip, IconButton, Segmented, Slider, Toggle, TopBar } from "@/c
 import { useMe, useUpdatePreferences } from "@/features/account/useMe";
 import { filtersForPractices } from "@/features/account/practices";
 import { NOTIFICATION_TYPES } from "@/features/notifications/icons";
+import { useNavigationStore } from "@/features/navigation/store";
 
 const BASEMAPS: Basemap[] = ["topo", "satellite", "ortho", "classic", "relief"];
 
@@ -104,6 +105,11 @@ export default function PreferencesPage() {
           </section>
 
           <section className="flex flex-col gap-3">
+            <h2 className="text-[16px] font-bold text-fg">{fr.navigation.title}</h2>
+            <NavigationPreferences />
+          </section>
+
+          <section className="flex flex-col gap-3">
             <h2 className="text-[16px] font-bold text-fg">{fr.profilePage.aroundRadius}</h2>
             <Slider label={fr.around.radius} min={500} max={10000} step={500} value={prefs.aroundRadiusM} onChange={(v) => set("aroundRadiusM", v)} formatValue={formatDistance} />
           </section>
@@ -117,5 +123,26 @@ export default function PreferencesPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/** Préférences de navigation (locales à l'appareil : activité, précision du suivi, guidage vocal). */
+function NavigationPreferences() {
+  const activity = useNavigationStore((s) => s.activity);
+  const setActivity = useNavigationStore((s) => s.setActivity);
+  const trackingMode = useNavigationStore((s) => s.trackingMode);
+  const setTrackingMode = useNavigationStore((s) => s.setTrackingMode);
+  const voice = useNavigationStore((s) => s.voice);
+  const setVoice = useNavigationStore((s) => s.setVoice);
+  return (
+    <>
+      <p className="text-[14px] font-semibold text-fg">{fr.navigation.activity}</p>
+      <Segmented aria-label={fr.navigation.activity} value={activity} onChange={setActivity} options={(["hiking", "trail", "mtb", "equestrian"] as const).map((a) => ({ value: a, label: fr.navigation.activities[a] }))} />
+      <p className="text-[14px] font-semibold text-fg">{fr.navigation.trackingMode}</p>
+      <Segmented aria-label={fr.navigation.trackingMode} value={trackingMode} onChange={setTrackingMode} options={(["eco", "normal", "precise"] as const).map((m) => ({ value: m, label: fr.navigation.trackingModes[m] }))} />
+      <p className="text-[13px] text-muted">{fr.navigation.trackingHints[trackingMode]}</p>
+      <Toggle checked={voice} onChange={setVoice} label={fr.navigation.voice} description={fr.navigation.voiceHint} />
+      <p className="text-[13px] text-muted">Ces réglages restent sur cet appareil et s'appliquent immédiatement.</p>
+    </>
   );
 }
