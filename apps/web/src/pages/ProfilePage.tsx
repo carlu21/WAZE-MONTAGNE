@@ -127,8 +127,9 @@ export default function ProfilePage() {
             size="lg"
             leftIcon={<LogOut />}
             onClick={() => {
-              logout();
+              // Quitter d'abord la page protégée, puis fermer la session (évite la redirection vers la connexion).
               navigate("/map", { replace: true });
+              window.setTimeout(logout, 0);
             }}
           >
             {fr.auth.logout}

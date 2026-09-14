@@ -53,7 +53,7 @@ export const TOAST_QUEUED = "Enregistré. Il sera publié dès le retour du rés
 const TITLES: Record<WizardStep, string> = {
   category: "Signaler",
   subtype: fr.wizard.chooseSubtype,
-  details: "Détails du signalement",
+  details: "Détails",
   done: "Merci !",
 };
 

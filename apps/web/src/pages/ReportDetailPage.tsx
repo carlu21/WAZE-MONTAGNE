@@ -51,6 +51,7 @@ import { CommentsSection } from "@/features/report-detail/CommentsSection";
 import { useReportActions, useReportDetail } from "@/features/report-detail/useReportDetail";
 import { reportUrl, shareReport, shareTitle } from "@/features/report-detail/share";
 import { resizeImage } from "@/features/report/photo";
+import { useGeolocation } from "@/features/map/useGeolocation";
 
 const KIND_LABEL: Record<ConfirmationKind, string> = Object.fromEntries(CONFIRMATION_KINDS.map((k) => [k.id, k.label])) as Record<ConfirmationKind, string>;
 const CLOSED_STATUSES = new Set<Report["status"]>(["resolved", "expired", "deleted"]);
@@ -63,6 +64,8 @@ export default function ReportDetailPage() {
   const setView = useUiStore((s) => s.setView);
   const query = useReportDetail(id);
   const actions = useReportActions(id);
+  // Distance depuis l'utilisateur : suivi de position (si déjà autorisé) sans demande intrusive.
+  useGeolocation();
 
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeText, setDisputeText] = useState("");

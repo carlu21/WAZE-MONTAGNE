@@ -1,44 +1,44 @@
-# @mountain-live/web
-
-Application web / PWA de Mountain Live : Vite + React 19 + TypeScript + Tailwind v4 + react-router v7 +
-TanStack Query + zustand + maplibre-gl + Dexie. Le design system est documenté dans
-`docs/DESIGN_SYSTEM.md`, le contrat HTTP dans `packages/core/src/api-contract.ts`.
+# @mountain-live/web — PWA Mountain Live
 
 ## Lancer
 
 ```bash
-pnpm --filter @mountain-live/api db:reset   # base + jeu de démo (Corse), comptes demo1234
-pnpm --filter @mountain-live/api dev        # API sur http://localhost:8787
-pnpm --filter @mountain-live/web dev        # http://localhost:5173
+pnpm --filter @mountain-live/api db:reset   # données de démonstration (Corse)
+pnpm dev                                    # ou : pnpm --filter @mountain-live/web dev
 ```
 
-Le serveur de développement relaie `/api` et `/uploads` vers l'API (les URL de photos sont relatives).
+Le serveur Vite (port 5173) relaie `/api` et `/uploads` vers l'API (port 8787). En production, définir `VITE_API_URL` si l'API n'est pas servie sur la même origine.
 
-## Vérifier
+`pnpm --filter @mountain-live/web build` génère `dist/` avec le service worker (`sw.js`) et le manifeste ; `preview` sert ce build.
 
-```bash
-pnpm --filter @mountain-live/web typecheck
-pnpm --filter @mountain-live/web test       # vitest + jsdom + Testing Library
-pnpm --filter @mountain-live/web build      # tsc + vite build + service worker (dist/sw.js)
-```
+## Structure de `src/`
 
-## Structure
-
-| Dossier | Rôle |
+| Dossier | Contenu |
 | --- | --- |
-| `src/main.tsx`, `src/App.tsx` | Point d'entrée : `QueryClientProvider` → `ToastProvider` → `RouterProvider`. |
-| `src/router.tsx` | Toutes les routes ; pages chargées à la demande depuis `src/pages/<Nom>Page.tsx`. |
-| `src/components/layout` | `AppShell` (barre basse 5 entrées / barre latérale, bannière hors connexion, veilleur d'alertes), `guards` (`RequireAuth`, `RequireRole`). |
-| `src/components/ui` | Design system (`@/components/ui`). |
-| `src/components/map` | Marqueurs et couches MapLibre générés depuis la taxonomie. |
-| `src/features` | Fonctionnalités transverses (hors connexion, alertes de proximité). |
-| `src/lib` | Client HTTP typé (`api.ts`), clés TanStack Query (`queryKeys.ts`), base locale Dexie (`db.ts`), file d'attente hors connexion (`outbox.ts`), thème, toasts, formatage. |
-| `src/store` | Session (jeton + utilisateur, persistée) et préférences d'interface. |
-| `src/styles` | `tokens.css` (palette, tokens sémantiques, dimensions) et `index.css`. |
+| `pages/` | un composant par route (`router.tsx`) |
+| `features/map` | carte principale : chargement des signalements (`useReports`), couches (signalements, alertes officielles, présence), géolocalisation, recherche, filtres, aperçu, légende |
+| `features/report` | assistant de signalement : état du brouillon, position, photo, étapes, publication / file d'attente |
+| `features/report-detail` | fiche : données, votes, commentaires, partage, carte statique |
+| `features/account`, `features/notifications` | onboarding, pratiques, authentification, profil, préférences |
+| `features/explore`, `features/around`, `features/community` | recherche de secteur, mini-carte, fusion « autour de moi » |
+| `features/offline` | réseau, synchronisation, bannière, tuiles, zones, sélecteur de zone |
+| `features/alerts` | moteur d'alertes de proximité, veilleur, présence agrégée |
+| `features/admin`, `features/pro` | graphiques SVG, CSV, saisie de géométrie |
+| `components/ui` | design system (voir `docs/DESIGN_SYSTEM.md`) |
+| `components/map` | `MapView` MapLibre, fonds de carte, couches, images de marqueurs |
+| `lib/` | client API typé, clés de requête, Dexie, file d'attente, formats, thème, toasts, service worker |
+| `store/` | zustand : session (jeton, utilisateur, onboarding) et interface (filtres, fond, thème, vue, position, réseau) |
 
-## PWA
+## Ajouter un écran
 
-`vite-plugin-pwa` (mode `generateSW`, mise à jour automatique) précache l'application et ses icônes
-(`public/icons`, régénérables avec `node apps/web/scripts/generate-icons.mjs`). Règles d'exécution :
-tuiles cartographiques et photos `/uploads/*` en cache-first, API `/api/*` en network-first avec repli
-cache ; les navigations vers `/api/*` et `/uploads/*` ne reçoivent jamais `index.html`.
+1. Créer `src/pages/<Nom>Page.tsx` (export par défaut) et la logique dans `src/features/<domaine>/`.
+2. Déclarer la route dans `src/router.tsx` (dans la coquille pour avoir la barre basse, hors coquille pour un écran plein).
+3. Utiliser les composants de `@/components/ui`, le client `@/lib/api` et les clés `@/lib/queryKeys`.
+
+## Ajouter un sous-type de signalement
+
+Voir `CONTRIBUTING.md` : tout part de `packages/core/src/taxonomy.ts` ; les tests vérifient que l'icône lucide existe.
+
+## Tests
+
+`pnpm --filter @mountain-live/web test` (vitest + testing-library, jsdom).

@@ -53,10 +53,12 @@ export default function SettingsPage() {
     mutationFn: () => api.users.deleteMe(),
     onSuccess: async () => {
       await clearLocalData().catch(() => undefined);
-      logout();
-      queryClient.clear();
-      toast.success(fr.profilePage.deleted);
       navigate("/map", { replace: true });
+      window.setTimeout(() => {
+        logout();
+        queryClient.clear();
+      }, 0);
+      toast.success(fr.profilePage.deleted);
     },
     onError: (e) => toast.danger(e instanceof ApiError ? e.message : fr.errors.network),
   });
