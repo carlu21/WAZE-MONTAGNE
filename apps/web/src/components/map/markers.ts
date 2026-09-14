@@ -261,3 +261,24 @@ export const REPORT_SYMBOL_LAYOUT: NonNullable<SymbolLayerSpecification["layout"
 export const REPORT_SYMBOL_PAINT: NonNullable<SymbolLayerSpecification["paint"]> = {
   "icon-opacity": ["coalesce", ["get", "fade"], 1],
 };
+
+/* ------------------------------------------------------------------ */
+/* Images ponctuelles (marqueur de recherche…)                          */
+/* ------------------------------------------------------------------ */
+
+/** Marqueur temporaire d'un lieu trouvé par la recherche (goutte vert forêt, épingle). */
+export const SEARCH_MARKER_IMAGE_ID = "ml-marker-search";
+
+export function searchMarkerSvg(): string {
+  return buildMarkerSvg({ icon: "map-pin", color: "#1F4D28", size: MARKER_SIZE_SELECTED, selected: false });
+}
+
+/**
+ * Enregistre une image SVG sur la carte si elle n'y est pas déjà (utile pour
+ * les images hors taxonomie, chargées à la demande).
+ */
+export async function ensureImage(map: MaplibreMap, id: string, svg: string, pixelRatio = 2): Promise<void> {
+  if (map.hasImage(id)) return;
+  const img = await loadSvgImage(svg, pixelRatio);
+  if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio });
+}
