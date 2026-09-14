@@ -1,0 +1,33 @@
+{
+  "name": "@mountain-live/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:reset": "rm -f data/mountain-live.db && tsx src/db/migrate.ts && tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.1",
+    "@mountain-live/core": "workspace:*",
+    "better-sqlite3": "^11.9.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.7.7",
+    "nanoid": "^5.1.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.14.1",
+    "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

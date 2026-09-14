@@ -1,0 +1,27 @@
+{
+  "name": "mountain-live",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Projet Mountain Live — la couche d'information temps réel de la montagne (MVP)",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev:api": "pnpm --filter @mountain-live/api dev",
+    "dev:web": "pnpm --filter @mountain-live/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "db:migrate": "pnpm --filter @mountain-live/api db:migrate",
+    "db:seed": "pnpm --filter @mountain-live/api db:seed"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

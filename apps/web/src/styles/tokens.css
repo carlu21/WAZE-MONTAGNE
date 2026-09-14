@@ -1,0 +1,72 @@
+/*
+ * Design tokens — Mountain Live (section 19).
+ * Palette : vert forêt, vert profond, beige naturel, blanc cassé, gris roche,
+ * orange sécurité, rouge danger (rouge réservé aux alertes importantes).
+ * La tâche "design-system" complète et documente ces tokens.
+ */
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-forest-900: #14351B;
+  --color-forest-800: #1F4D28;
+  --color-forest-700: #2F6B3A;
+  --color-forest-500: #4F8A5B;
+  --color-forest-200: #C9DDCB;
+  --color-sand-50: #F9F7F1;
+  --color-sand-100: #F4F1EA;
+  --color-sand-200: #E8E2D4;
+  --color-rock-900: #1E2429;
+  --color-rock-700: #3E4A54;
+  --color-rock-500: #5B6B7A;
+  --color-rock-300: #A9B3BC;
+  --color-rock-100: #E5E9ED;
+  --color-safety-500: #D9822B;
+  --color-danger-600: #C8341F;
+  --color-water-500: #1D6FA5;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+}
+
+:root {
+  --bg: var(--color-sand-100);
+  --bg-elev: #FFFFFF;
+  --fg: var(--color-rock-900);
+  --fg-muted: var(--color-rock-500);
+  --border: var(--color-sand-200);
+  --primary: var(--color-forest-800);
+  --primary-fg: #FFFFFF;
+  --accent: var(--color-safety-500);
+  --c-danger: #C8341F;
+  --c-path: #D9822B;
+  --c-activity: #B45309;
+  --c-animals: #6B4F2A;
+  --c-water: #1D6FA5;
+  --c-crowd: #5B6B7A;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 64px;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0F1613;
+  --bg-elev: #17211C;
+  --fg: #F1F3EE;
+  --fg-muted: #A9B3AC;
+  --border: #2A362F;
+  --primary: #4F8A5B;
+  --primary-fg: #0F1613;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1613;
+    --bg-elev: #17211C;
+    --fg: #F1F3EE;
+    --fg-muted: #A9B3AC;
+    --border: #2A362F;
+    --primary: #4F8A5B;
+    --primary-fg: #0F1613;
+    color-scheme: dark;
+  }
+}
