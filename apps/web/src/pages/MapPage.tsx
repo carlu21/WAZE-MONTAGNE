@@ -90,8 +90,18 @@ export default function MapPage() {
       if (animate) map.flyTo({ center: [center.lng, center.lat], zoom: targetZoom, duration: 900, essential: true });
       else map.jumpTo({ center: [center.lng, center.lat], zoom: targetZoom });
     };
-    if (map.loaded()) go();
-    else map.once("load", () => window.setTimeout(go, 0));
+    const arrived = () => isMapAlive(map) && Math.abs(map.getZoom() - targetZoom) < 0.5;
+    go();
+    // Tant que la première image n'est pas rendue, MapLibre peut ignorer le mouvement : on réessaie
+    // dès que la carte est au repos, puis une dernière fois par sécurité.
+    if (!arrived()) {
+      map.once("idle", () => {
+        if (!arrived()) go();
+      });
+      window.setTimeout(() => {
+        if (!arrived()) go();
+      }, 1500);
+    }
   }, []);
 
   const flyTo = useCallback(
