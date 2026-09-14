@@ -156,7 +156,7 @@ describe("alertes, présence et géométrie", () => {
     expect(ring).toHaveLength(17);
     expect(ring[0]).toEqual(ring[16]);
     expect(ring[0][0]).toBeGreaterThan(9.15);
-    // 400 m ≈ 3 461 px au zoom 20 à 42,3° de latitude (tuiles 512 px).
-    expect(metersToPixelsAtZoom(400, 42.3, 20)).toBeCloseTo(3461, -1);
+    // 400 m ≈ 7 245 px au zoom 20 à 42,3° de latitude (monde de 512 × 2^z px dans MapLibre).
+    expect(metersToPixelsAtZoom(400, 42.3, 20)).toBeCloseTo(7245, -1);
   });
 });
