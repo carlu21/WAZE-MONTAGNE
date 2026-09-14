@@ -1,0 +1,65 @@
+#!/bin/bash
+# Double-cliquez sur ce fichier dans le Finder : il ouvre le Terminal, prépare le projet
+# au premier lancement, démarre l'API et l'application web, puis ouvre le navigateur.
+# Pour arrêter : Ctrl + C dans cette fenêtre (ou fermez-la).
+
+cd "$(dirname "$0")" || exit 1
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+fail() { printf '\n\033[31m%s\033[0m\n' "$1"; printf 'Appuyez sur Entrée pour fermer.'; read -r; exit 1; }
+
+bold "Mountain Live — la montagne en temps réel"
+echo "Dossier : $(pwd)"
+echo
+
+# 1. Node.js (version 20 minimum)
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js n'est pas installé. Ouverture de la page de téléchargement…"
+  command -v open >/dev/null 2>&1 && open "https://nodejs.org/fr/download"
+  fail "Installez Node.js (version LTS), puis relancez ce fichier."
+fi
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+if [ "$NODE_MAJOR" -lt 20 ]; then
+  command -v open >/dev/null 2>&1 && open "https://nodejs.org/fr/download"
+  fail "Node.js $(node -v) est trop ancien : installez la version 20 ou plus, puis relancez."
+fi
+echo "Node.js $(node -v) : OK"
+
+# 2. pnpm (via corepack, fourni avec Node : aucune installation globale nécessaire)
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+if command -v pnpm >/dev/null 2>&1; then
+  PNPM="pnpm"
+else
+  PNPM="corepack pnpm"
+fi
+echo "pnpm : $($PNPM --version 2>/dev/null || echo 'via corepack')"
+
+# 3. Dépendances (premier lancement ou mise à jour)
+if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.modules.yaml ]; then
+  bold "Installation des dépendances (quelques minutes la première fois)…"
+  $PNPM install || fail "L'installation des dépendances a échoué."
+fi
+
+# 4. Base de données de démonstration (créée seulement si absente : vos données sont conservées)
+if [ ! -f apps/api/data/mountain-live.db ]; then
+  bold "Création de la base de données et du jeu de données Corse…"
+  $PNPM --filter @mountain-live/api db:reset || fail "La création de la base a échoué."
+fi
+
+# 5. Ouverture du navigateur dès que l'application répond
+(
+  for _ in $(seq 1 90); do
+    if curl -sf http://localhost:5173/ >/dev/null 2>&1 && curl -sf http://localhost:8787/api/v1/health >/dev/null 2>&1; then
+      command -v open >/dev/null 2>&1 && open "http://localhost:5173"
+      exit 0
+    fi
+    sleep 1
+  done
+) &
+
+bold "Démarrage de l'application…"
+echo "  Web : http://localhost:5173   API : http://localhost:8787"
+echo "  Comptes de démo : rando@mountain-live.demo / demo1234 (admin@… pour le back-office)"
+echo "  Pour arrêter : Ctrl + C"
+echo
+$PNPM dev

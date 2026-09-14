@@ -10,7 +10,9 @@ Les applications classiques répondent à « Où puis-je aller ? ». Mountain Li
 
 ## Démarrage rapide
 
-Prérequis : Node.js ≥ 20 et pnpm 10 (`corepack enable`).
+**Sur Mac, sans ligne de commande** : double-cliquez sur `Lancer Mountain Live.command` dans le Finder. Le Terminal s'ouvre, installe ce qu'il faut au premier lancement (Node.js 20+ doit être installé : [nodejs.org](https://nodejs.org/fr/download)), démarre l'application et ouvre le navigateur. `Reinitialiser les donnees.command` remet le jeu de données de démonstration à zéro. Si macOS refuse d'ouvrir le fichier, clic droit → Ouvrir, ou dans le Terminal : `chmod +x *.command`.
+
+Prérequis en ligne de commande : Node.js ≥ 20 et pnpm 10 (`corepack enable`).
 
 ```bash
 pnpm install
