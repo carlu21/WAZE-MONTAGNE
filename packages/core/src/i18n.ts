@@ -290,6 +290,7 @@ export const fr = {
       satellite: "Satellite",
       classic: "Classique",
       relief: "Relief",
+      ortho: "Ortho IGN",
     } satisfies Record<Basemap, string>,
     aroundRadius: "Rayon « Autour de moi »",
     privacy: "Politique de confidentialité",

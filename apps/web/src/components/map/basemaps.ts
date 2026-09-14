@@ -37,7 +37,37 @@ export interface BasemapDef {
   maxzoom: number;
   /** Ajoute l'ombrage du relief par-dessus les tuiles. */
   hillshade: boolean;
+  /** Couches raster superposées (routes, noms de lieux) : vue « hybride » à la Google Maps. */
+  overlays?: BasemapOverlay[];
 }
+
+export interface BasemapOverlay {
+  id: string;
+  tiles: string[];
+  attribution?: string;
+  maxzoom: number;
+  opacity?: number;
+}
+
+/** Routes et noms de lieux (fond transparent) à superposer aux images aériennes. */
+const ESRI_REFERENCE_OVERLAYS: BasemapOverlay[] = [
+  {
+    id: "roads",
+    tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"],
+    maxzoom: 19,
+    opacity: 0.9,
+  },
+  {
+    id: "places",
+    tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+    maxzoom: 19,
+  },
+];
+
+/** Orthophotos IGN (BD ORTHO, jusqu'à 20 cm) servies par la Géoplateforme, sans clé. */
+const IGN_ORTHO_TILES = [
+  "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
+];
 
 const OPENTOPOMAP_TILES = ["a", "b", "c"].map((s) => `https://${s}.tile.opentopomap.org/{z}/{x}/{y}.png`);
 const OPENTOPOMAP_ATTRIBUTION = "© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)";
@@ -55,11 +85,22 @@ export const BASEMAPS: Record<Basemap, BasemapDef> = {
   satellite: {
     id: "satellite",
     label: fr.profilePage.basemaps.satellite,
-    description: "Images aériennes pour repérer le terrain.",
+    description: "Images aériennes mondiales avec routes et noms de lieux (vue hybride).",
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
     attribution: "© Esri, Maxar, Earthstar Geographics, GIS User Community",
     maxzoom: 19,
     hillshade: false,
+    overlays: ESRI_REFERENCE_OVERLAYS,
+  },
+  ortho: {
+    id: "ortho",
+    label: fr.profilePage.basemaps.ortho,
+    description: "Orthophotos IGN haute résolution (France) avec routes et noms de lieux.",
+    tiles: IGN_ORTHO_TILES,
+    attribution: "© IGN — Géoplateforme (BD ORTHO) | © Esri",
+    maxzoom: 19,
+    hillshade: false,
+    overlays: ESRI_REFERENCE_OVERLAYS,
   },
   classic: {
     id: "classic",
@@ -82,7 +123,7 @@ export const BASEMAPS: Record<Basemap, BasemapDef> = {
 };
 
 /** Ordre de présentation dans le sélecteur (section 10). */
-export const BASEMAP_ORDER: readonly Basemap[] = ["topo", "satellite", "classic", "relief"];
+export const BASEMAP_ORDER: readonly Basemap[] = ["topo", "satellite", "ortho", "classic", "relief"];
 
 export function isBasemap(value: unknown): value is Basemap {
   return typeof value === "string" && value in BASEMAPS;
@@ -105,6 +146,11 @@ export function buildBasemapStyle(basemap: Basemap): StyleSpecification {
     { id: BACKGROUND_LAYER_ID, type: "background", paint: { "background-color": "#e8e2d4" } },
     { id: BASEMAP_LAYER_ID, type: "raster", source: BASEMAP_SOURCE_ID, paint: { "raster-fade-duration": 150 } },
   ];
+  for (const overlay of def.overlays ?? []) {
+    const sourceId = `${BASEMAP_SOURCE_ID}-${overlay.id}`;
+    sources[sourceId] = { type: "raster", tiles: overlay.tiles, tileSize: 256, maxzoom: overlay.maxzoom, attribution: overlay.attribution };
+    layers.push({ id: `${BASEMAP_LAYER_ID}-${overlay.id}`, type: "raster", source: sourceId, paint: { "raster-fade-duration": 150, "raster-opacity": overlay.opacity ?? 1 } });
+  }
   if (def.hillshade) {
     sources[TERRAIN_SOURCE_ID] = {
       type: "raster-dem",

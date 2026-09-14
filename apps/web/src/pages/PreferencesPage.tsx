@@ -11,7 +11,7 @@ import { useMe, useUpdatePreferences } from "@/features/account/useMe";
 import { filtersForPractices } from "@/features/account/practices";
 import { NOTIFICATION_TYPES } from "@/features/notifications/icons";
 
-const BASEMAPS: Basemap[] = ["topo", "satellite", "classic", "relief"];
+const BASEMAPS: Basemap[] = ["topo", "satellite", "ortho", "classic", "relief"];
 
 export default function PreferencesPage() {
   const navigate = useNavigate();

@@ -148,7 +148,7 @@ export type AreaType =
   /** Source, fontaine, résurgence. */
   | "spring";
 
-export type Basemap = "topo" | "satellite" | "classic" | "relief";
+export type Basemap = "topo" | "satellite" | "classic" | "relief" | "ortho";
 
 export interface LatLng {
   lat: number;

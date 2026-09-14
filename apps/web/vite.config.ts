@@ -37,7 +37,7 @@ export default defineConfig({
           {
             // Tuiles cartographiques : cache-first, longue durée (mode hors connexion basique)
             urlPattern: ({ url }) =>
-              /tile\.opentopomap\.org|demotiles\.maplibre\.org|tile\.openstreetmap\.org|server\.arcgisonline\.com|s3\.amazonaws\.com\/elevation-tiles-prod/.test(
+              /tile\.opentopomap\.org|demotiles\.maplibre\.org|tile\.openstreetmap\.org|server\.arcgisonline\.com|data\.geopf\.fr\/wmts|s3\.amazonaws\.com\/elevation-tiles-prod/.test(
                 url.host + url.pathname,
               ),
             handler: "CacheFirst",

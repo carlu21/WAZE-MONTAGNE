@@ -25,7 +25,7 @@ export const practiceSchema = z.enum([
   "manager",
   "other",
 ]);
-export const basemapSchema = z.enum(["topo", "satellite", "classic", "relief"]);
+export const basemapSchema = z.enum(["topo", "satellite", "classic", "relief", "ortho"]);
 export const flagReasonSchema = z.enum([
   "false_info",
   "dangerous_content",

@@ -55,7 +55,8 @@ export default function LegalPage() {
             <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px]">
               <li>Données © les contributeurs OpenStreetMap (ODbL).</li>
               <li>Fond topographique © OpenTopoMap (CC-BY-SA), données SRTM.</li>
-              <li>Imagerie satellite : Esri World Imagery (Esri, Maxar, Earthstar Geographics et la communauté des utilisateurs SIG).</li>
+              <li>Imagerie satellite : Esri World Imagery, routes et noms de lieux Esri Reference (Esri, Maxar, Earthstar Geographics et la communauté des utilisateurs SIG).</li>
+              <li>Orthophotos « Ortho IGN » : © IGN, Géoplateforme (BD ORTHO), Licence Ouverte Etalab.</li>
               <li>Relief : AWS Terrain Tiles (Mapzen / Amazon).</li>
               <li>Référentiel des lieux-dits et toponymes : GeoNames (CC BY 4.0) et géocodage IGN Géoplateforme (Licence Ouverte Etalab).</li>
             </ul>
