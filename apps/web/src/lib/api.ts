@@ -187,12 +187,12 @@ export const api = {
   },
   admin: {
     stats: () => request<AdminStats>("GET", "/admin/stats"),
-    reports: (p: { status?: string; category?: string; q?: string; page?: number }) =>
-      request<AdminReportsResponse>("GET", `/admin/reports${q(p)}`),
+    reports: (p: { status?: string; category?: string; q?: string; page?: number; includeInactive?: boolean }) =>
+      request<AdminReportsResponse>("GET", `/admin/reports${q({ ...p, includeInactive: p.includeInactive ? 1 : undefined })}`),
     updateReport: (id: string, input: Record<string, unknown>) =>
       request<{ report: Report }>("PATCH", `/admin/reports/${id}`, input),
     deleteReport: (id: string) => request<void>("DELETE", `/admin/reports/${id}`),
-    flags: (p: { status?: string }) => request<AdminFlagsResponse>("GET", `/admin/flags${q(p)}`),
+    flags: (p: { status?: string; page?: number }) => request<AdminFlagsResponse>("GET", `/admin/flags${q(p)}`),
     updateFlag: (id: string, input: { status: string; resolutionNote?: string | null; action?: string }) =>
       request<{ flag: ContentFlag }>("PATCH", `/admin/flags/${id}`, input),
     users: (p: { q?: string; page?: number }) => request<AdminUsersResponse>("GET", `/admin/users${q(p)}`),
