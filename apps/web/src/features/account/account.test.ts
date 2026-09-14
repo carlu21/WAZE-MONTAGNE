@@ -19,8 +19,9 @@ describe("compte", () => {
 
   it("fusionne les filtres recommandés des pratiques", () => {
     expect(filtersForPractices(["rider"])).toEqual(["animals", "activity", "path", "water", "danger"]);
-    expect(filtersForPractices(["hiker", "mtb"])).toContain("crowd");
-    // Toutes les catégories → tout afficher
+    expect(filtersForPractices(["trail"])).not.toContain("crowd");
+    // Toutes les catégories réunies → tout afficher (tableau vide)
+    expect(filtersForPractices(["hiker", "mtb"])).toEqual([]);
     expect(filtersForPractices(["professional"])).toEqual([]);
   });
 });
