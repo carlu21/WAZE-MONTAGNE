@@ -75,7 +75,7 @@ export const CATEGORIES: readonly CategoryDef[] = [
   {
     id: "activity",
     label: "Chasse / activités",
-    shortLabel: "Chasse",
+    shortLabel: "Chasse / activités",
     icon: "target",
     color: "#B45309",
     colorVar: "--c-activity",
