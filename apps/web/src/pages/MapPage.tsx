@@ -187,7 +187,12 @@ export default function MapPage() {
   );
 
   const filterCount = countActiveFilters(filters, showOfficialOnly);
-  const showEmpty = !loadingFirst && viewBBox !== null && visibleReports.length === 0 && officialAlerts.length === 0;
+  // Alertes officielles réellement dans la vue (l'emprise de requête est élargie).
+  const visibleAlerts = useMemo(
+    () => (viewBBox ? officialAlerts.filter((a) => inBBox({ lat: a.centroidLat, lng: a.centroidLng }, viewBBox)) : []),
+    [officialAlerts, viewBBox],
+  );
+  const showEmpty = !loadingFirst && viewBBox !== null && visibleReports.length === 0 && visibleAlerts.length === 0;
 
   return (
     <div className="relative h-full min-h-0 w-full overflow-hidden" data-testid="map-page">
