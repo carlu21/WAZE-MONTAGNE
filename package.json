@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm --parallel --stream --filter @mountain-live/api --filter @mountain-live/web dev",
     "dev:api": "pnpm --filter @mountain-live/api dev",
     "dev:web": "pnpm --filter @mountain-live/web dev",
     "build": "pnpm -r build",
