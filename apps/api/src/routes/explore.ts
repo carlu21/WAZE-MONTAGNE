@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import {
   aroundQuerySchema,
+  bboxFromCenter,
   bboxStringSchema,
   haversineM,
   type AreaSummary,
@@ -20,7 +21,6 @@ import { presenceEstimateInBBox } from "../services/presence";
 import { listOfficialAlerts, listTrailsInBBox, listWaterPointsInBBox, waterPointsAround } from "../services/reference";
 import { listVisibleReports, serializeReports } from "../services/reports";
 import { toArea, toOfficialAlert, toTrail, toWaterPoint } from "../services/serializers";
-import { bboxAround } from "../services/util";
 
 /**
  * Autour de moi / explorer : /around, /areas/search, /areas/:id, /trails, /water-points, /alerts/official
@@ -33,7 +33,7 @@ exploreRoutes.get("/around", optionalAuth, (c) => {
   const q = readQuery(c, aroundQuerySchema);
   const center = { lat: q.lat, lng: q.lng };
   const now = new Date();
-  const box = bboxAround(center, q.radius);
+  const box = bboxFromCenter(center, q.radius);
   const rows = listVisibleReports({ bbox: box, categories: q.categories as ReportCategory[] | undefined, limit: 1000 }, now);
   const items = serializeReports(rows, { now, origin: center, viewerId: c.get("user")?.id ?? null })
     .filter((r) => (r.distanceM ?? Infinity) <= q.radius)

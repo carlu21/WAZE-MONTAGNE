@@ -1,5 +1,5 @@
 import { and, gte, lt, lte, sql } from "drizzle-orm";
-import { haversineM, presenceCell, type BBox, type LatLng, type PresenceCell } from "@mountain-live/core";
+import { cellCenter, haversineM, inBBox, presenceCell, type BBox, type LatLng, type PresenceCell } from "@mountain-live/core";
 import { config } from "../config";
 import { db } from "../db/client";
 import { presencePings } from "../db/schema";
@@ -21,12 +21,6 @@ export function bucketStart(now: Date): string {
   return new Date(Math.floor(now.getTime() / ms) * ms).toISOString();
 }
 
-/** Centre d'une cellule « lat:lng » (arrondie à 0,01°). */
-export function cellCenter(cell: string): LatLng {
-  const [lat, lng] = cell.split(":").map(Number);
-  return { lat, lng };
-}
-
 export function recordPresence(p: LatLng, userId: string | null, now = new Date()): void {
   const cell = presenceCell(p);
   const bucket = bucketStart(now);
@@ -37,10 +31,8 @@ export function recordPresence(p: LatLng, userId: string | null, now = new Date(
       set: { count: sql`${presencePings.count} + 1` },
     })
     .run();
-  if (userId) {
-    const center = cellCenter(cell);
-    recentUserCells.set(userId, { lat: center.lat, lng: center.lng, at: now.getTime() });
-  }
+  const center = cellCenter(cell);
+  if (userId && center) recentUserCells.set(userId, { lat: center.lat, lng: center.lng, at: now.getTime() });
 }
 
 function retentionFloor(now: Date): string {
@@ -63,7 +55,7 @@ export function aggregatePresence(box: BBox, now = new Date()): { cells: Presenc
   let total = 0;
   for (const r of rows) {
     const c = cellCenter(r.cell);
-    if (c.lat < box.south || c.lat > box.north || c.lng < box.west || c.lng > box.east) continue;
+    if (!c || !inBBox(c, box)) continue;
     cells.push({ cell: r.cell, lat: c.lat, lng: c.lng, count: r.count });
     total += r.count;
   }
@@ -87,7 +79,7 @@ export function presencePingsBetween(box: BBox, fromIso: string, toIso: string):
   let total = 0;
   for (const r of rows) {
     const c = cellCenter(r.cell);
-    if (c.lat >= box.south && c.lat <= box.north && c.lng >= box.west && c.lng <= box.east) total += r.count;
+    if (c && inBBox(c, box)) total += r.count;
   }
   return total;
 }

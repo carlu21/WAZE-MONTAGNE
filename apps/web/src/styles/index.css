@@ -357,6 +357,22 @@ input[type="search"]::-webkit-search-cancel-button {
   opacity: 0.5;
 }
 
+/* Pastille (Badge) : couleur pilotée par --badge-color */
+.ml-badge {
+  --badge-color: var(--fg-muted);
+  background: color-mix(in srgb, var(--badge-color) 14%, var(--surface));
+  color: color-mix(in srgb, var(--badge-color) 82%, var(--fg));
+}
+:root[data-theme="dark"] .ml-badge {
+  background: color-mix(in srgb, var(--badge-color) 24%, var(--surface));
+  color: color-mix(in srgb, var(--badge-color) 45%, var(--fg));
+}
+.ml-badge--solid,
+:root[data-theme="dark"] .ml-badge--solid {
+  background: var(--badge-color);
+  color: #fff;
+}
+
 /* Feuille basse : poignée */
 .ml-sheet-handle {
   width: 44px;
@@ -384,6 +400,14 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 .ml-nav-item:active .ml-nav-item__icon {
   transform: scale(0.92);
+}
+
+.ml-nav-item[aria-current="page"] .ml-nav-item__icon svg {
+  transform: translateY(-1px);
+}
+/* Barre latérale (écran large) : l'élément actif se distingue aussi par un fond */
+[data-shell="desktop"] .ml-nav-item[aria-current="page"] {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 /* Bouton flottant « + Signaler » : halo pulsant discret */

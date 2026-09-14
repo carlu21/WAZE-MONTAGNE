@@ -85,6 +85,15 @@ export function listNotifications(userId: string, limit = 100): { notifications:
   return { notifications: rows, unreadCount: unread };
 }
 
+/** Notification appartenant à l'utilisateur, ou undefined. */
+export function getNotification(userId: string, id: string): NotificationRow | undefined {
+  return db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+    .get();
+}
+
 export function markNotificationRead(userId: string, id: string): boolean {
   const res = db
     .update(notifications)

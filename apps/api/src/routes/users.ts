@@ -2,7 +2,18 @@ import { Hono } from "hono";
 import { eq, sql } from "drizzle-orm";
 import { preferencesSchema, updateMeSchema, type UserPreferences } from "@mountain-live/core";
 import { db } from "../db/client";
-import { notifications, offlineZones, reportComments, reports, userPreferences, users, type UserRow } from "../db/schema";
+import {
+  notifications,
+  offlineZones,
+  partners,
+  photos,
+  reportComments,
+  reports,
+  userPreferences,
+  userReputationEvents,
+  users,
+  type UserRow,
+} from "../db/schema";
 import { requireAuth, type AppEnv } from "../middleware/auth";
 import { readJson } from "../middleware/validate";
 import { HttpError } from "../services/errors";
@@ -71,6 +82,10 @@ usersRoutes.delete("/me", requireAuth, (c) => {
     // Signalements et commentaires conservés, mais détachés de la personne.
     tx.update(reports).set({ userId: null, updatedAt: now }).where(eq(reports.userId, user.id)).run();
     tx.update(reportComments).set({ userId: null }).where(eq(reportComments.userId, user.id)).run();
+    tx.update(photos).set({ userId: null }).where(eq(photos.userId, user.id)).run();
+    // Données propres à la personne : fiche partenaire, journal de réputation, préférences, notifications, zones.
+    tx.delete(partners).where(eq(partners.userId, user.id)).run();
+    tx.delete(userReputationEvents).where(eq(userReputationEvents.userId, user.id)).run();
     tx.delete(userPreferences).where(eq(userPreferences.userId, user.id)).run();
     tx.delete(notifications).where(eq(notifications.userId, user.id)).run();
     tx.delete(offlineZones).where(eq(offlineZones.userId, user.id)).run();

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, eq, gte, lte, ne, sql, type SQL } from "drizzle-orm";
-import { CATEGORY_IDS, presenceCell, type BBox, type ProDashboard, type ReportCategory, type ReportSubtype } from "@mountain-live/core";
+import { CATEGORY_IDS, cellCenter, presenceCell, type BBox, type ProDashboard, type ReportCategory, type ReportSubtype } from "@mountain-live/core";
 import { z } from "zod";
 import { db } from "../db/client";
 import { areas, reports } from "../db/schema";
@@ -25,13 +25,6 @@ const querySchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
 });
-
-/** Cellule d'agrégation 0,01° (≈ 1 km) : centre de cellule. */
-function cellCenterOf(lat: number, lng: number): { key: string; lat: number; lng: number } {
-  const key = presenceCell({ lat, lng });
-  const [clat, clng] = key.split(":").map(Number);
-  return { key, lat: clat, lng: clng };
-}
 
 proRoutes.get("/dashboard", (c) => {
   const q = readQuery(c, querySchema);
@@ -71,11 +64,13 @@ proRoutes.get("/dashboard", (c) => {
   for (const r of rows) {
     byCategory[r.category] += 1;
     subtypeCounts.set(r.subtype, (subtypeCounts.get(r.subtype) ?? 0) + 1);
-    const cell = cellCenterOf(r.displayLat, r.displayLng);
-    const entry = cells.get(cell.key) ?? { lat: cell.lat, lng: cell.lng, count: 0, categories: new Set<ReportCategory>() };
+    // Agrégation sur la grille de présence (~1 km) : les zones chaudes n'exposent jamais un point individuel.
+    const key = presenceCell({ lat: r.displayLat, lng: r.displayLng });
+    const center = cellCenter(key) ?? { lat: r.displayLat, lng: r.displayLng };
+    const entry = cells.get(key) ?? { lat: center.lat, lng: center.lng, count: 0, categories: new Set<ReportCategory>() };
     entry.count += 1;
     entry.categories.add(r.category);
-    cells.set(cell.key, entry);
+    cells.set(key, entry);
     const day = r.createdAt.slice(0, 10);
     timelineMap.set(day, (timelineMap.get(day) ?? 0) + 1);
     if (r.subtype === "spring_dry") {

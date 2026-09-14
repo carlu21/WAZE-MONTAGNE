@@ -9,7 +9,8 @@
  *   toast.alert({ title: "Battue signalée à 600 m", action: { label: "Voir", onClick } });
  *
  * L'affichage est assuré par <ToastProvider /> (src/components/ui/Toast.tsx),
- * monté une seule fois dans AppShell. Le hook `useToasts()` expose la liste.
+ * monté une seule fois dans App.tsx (autour du routeur, donc disponible aussi hors
+ * de la coquille : connexion, assistant). Le hook `useToasts()` expose la liste.
  */
 import { useSyncExternalStore, type ReactNode } from "react";
 

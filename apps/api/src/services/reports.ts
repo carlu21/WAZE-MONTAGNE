@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, ne, or, sql, type SQ
 import {
   computeConfidence,
   confidenceLabel,
+  formatDistance,
   isExpired,
   recencyWindowMin,
   SUBTYPE_BY_ID,
@@ -74,11 +75,13 @@ export interface ListFilters {
   source?: ReportSource;
   since?: string;
   limit?: number;
+  /** Modération : inclure aussi les signalements expirés / résolus (jamais les supprimés). */
+  includeInactive?: boolean;
 }
 
 /** Signalements visibles, priorité d'affichage décroissante puis plus récents d'abord. */
 export function listVisibleReports(filters: ListFilters, now = new Date()): ReportRow[] {
-  const conds: SQL[] = [...visibleConditions(now)];
+  const conds: SQL[] = filters.includeInactive ? [ne(reports.status, "deleted")] : [...visibleConditions(now)];
   if (filters.bbox) conds.push(...bboxConditions(filters.bbox));
   if (filters.categories?.length) conds.push(inArray(reports.category, filters.categories));
   if (filters.source) conds.push(eq(reports.source, filters.source));
@@ -267,7 +270,8 @@ export function createReport(user: UserRow, input: CreateReportData): { row: Rep
 function dispatchProximityAlerts(row: ReportRow, authorId: string | null): void {
   const label = SUBTYPE_BY_ID[row.subtype].label;
   const where = row.zone ? ` (${row.zone})` : "";
-  const at = { lat: row.lat, lng: row.lng };
+  // Position servie (floutée pour une espèce sensible) : la distance annoncée reste cohérente avec la carte.
+  const at = { lat: row.displayLat, lng: row.displayLng };
   if (row.subtype === "battue" || row.subtype === "hunting") {
     const until = row.endsAt ? ` jusqu'à ${formatDateFr(row.endsAt)}` : "";
     notifyNearbyUsers({
@@ -275,7 +279,7 @@ function dispatchProximityAlerts(row: ReportRow, authorId: string | null): void 
       category: row.category,
       type: "new_battue_nearby",
       title: `${label} signalée à proximité`,
-      body: (d) => `Attention : ${label.toLowerCase()} signalée à ${distanceText(d)}${where}${until}.`,
+      body: (d) => `Attention : ${label.toLowerCase()} signalée à ${formatDistance(d)}${where}${until}.`,
       reportId: row.id,
       excludeUserId: authorId,
     });
@@ -285,7 +289,7 @@ function dispatchProximityAlerts(row: ReportRow, authorId: string | null): void 
       category: row.category,
       type: "new_danger_on_route",
       title: `${label} signalé à proximité`,
-      body: (d) => `${label} signalé à ${distanceText(d)}${where}. Redoublez de prudence.`,
+      body: (d) => `${label} signalé à ${formatDistance(d)}${where}. Redoublez de prudence.`,
       reportId: row.id,
       excludeUserId: authorId,
     });
@@ -295,7 +299,7 @@ function dispatchProximityAlerts(row: ReportRow, authorId: string | null): void 
       category: row.category,
       type: "trail_closed",
       title: "Fermeture signalée à proximité",
-      body: (d) => `${label} à ${distanceText(d)}${where}.`,
+      body: (d) => `${label} à ${formatDistance(d)}${where}.`,
       reportId: row.id,
       excludeUserId: authorId,
     });
@@ -305,15 +309,11 @@ function dispatchProximityAlerts(row: ReportRow, authorId: string | null): void 
       category: row.category,
       type: "new_danger_on_route",
       title: `${label} signalés à proximité`,
-      body: (d) => `${label} signalés à ${distanceText(d)}${where}.`,
+      body: (d) => `${label} signalés à ${formatDistance(d)}${where}.`,
       reportId: row.id,
       excludeUserId: authorId,
     });
   }
-}
-
-function distanceText(m: number): string {
-  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace(".0", "").replace(".", ",")} km`;
 }
 
 // ---------------------------------------------------------------------------

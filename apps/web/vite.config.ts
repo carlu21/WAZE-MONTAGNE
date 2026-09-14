@@ -31,6 +31,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: "/index.html",
+        // Une navigation directe vers l'API ou une photo ne doit jamais recevoir index.html.
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
         runtimeCaching: [
           {
             // Tuiles cartographiques : cache-first, longue durée (mode hors connexion basique)
@@ -42,6 +44,16 @@ export default defineConfig({
             options: {
               cacheName: "map-tiles",
               expiration: { maxEntries: 6000, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Photos des signalements : immuables côté API, cache-first
+            urlPattern: ({ url }) => url.pathname.startsWith("/uploads/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "photos",
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
@@ -64,7 +76,11 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   server: {
     port: 5173,
-    proxy: { "/api": { target: "http://localhost:8787", changeOrigin: true } },
+    proxy: {
+      // API et photos (photoUrl / photos[].url sont des chemins relatifs « /uploads/… » servis par l'API).
+      "/api": { target: "http://localhost:8787", changeOrigin: true },
+      "/uploads": { target: "http://localhost:8787", changeOrigin: true },
+    },
   },
   build: {
     target: "es2022",

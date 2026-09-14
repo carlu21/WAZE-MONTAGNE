@@ -1,8 +1,8 @@
 import { and, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
-import { haversineM, type BBox, type LatLng, type OfficialAlertInput, type ReportCategory } from "@mountain-live/core";
+import { bboxFromCenter, haversineM, type BBox, type LatLng, type OfficialAlertInput, type ReportCategory } from "@mountain-live/core";
 import { db } from "../db/client";
 import { officialAlerts, trails, waterPoints, type OfficialAlertRow, type TrailRow, type WaterPointRow } from "../db/schema";
-import { bboxAround, geometryExtent, newId, nowIso } from "./util";
+import { geometryExtent, newId, nowIso } from "./util";
 
 /** Données de référence (sentiers, points d'eau) et alertes officielles. */
 
@@ -32,7 +32,7 @@ export function listWaterPointsInBBox(box: BBox): WaterPointRow[] {
 }
 
 export function waterPointsAround(p: LatLng, radiusM: number): (WaterPointRow & { distanceM: number })[] {
-  return listWaterPointsInBBox(bboxAround(p, radiusM))
+  return listWaterPointsInBBox(bboxFromCenter(p, radiusM))
     .map((w) => ({ ...w, distanceM: Math.round(haversineM(p, { lat: w.lat, lng: w.lng })) }))
     .filter((w) => w.distanceM <= radiusM)
     .sort((a, b) => a.distanceM - b.distanceM);

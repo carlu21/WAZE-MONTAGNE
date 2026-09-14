@@ -1,14 +1,18 @@
 /**
  * Formatage français pour l'interface web.
  *
- * - `formatRelative`  : « il y a 35 min » (date-fns, locale fr, unités abrégées par défaut)
+ * - `formatRelative`  : « il y a 35 min » — délègue à @mountain-live/core (même
+ *                       rendu que l'API et les notifications) ; style « long »
+ *                       en toutes lettres via date-fns.
  * - `formatDateTime`  : « aujourd'hui à 18 h 05 », « hier à 9 h 30 », « 14 sept. à 18 h 05 »
  * - `formatDistance`  : ré-export de @mountain-live/core (« 320 m », « 1,2 km »)
  * - `formatCount`     : « 8 utilisateurs », « 1 utilisateur »
  * - `pluralize`       : règle française (pluriel à partir de 2)
+ * - `formatBadgeCount`: « 3 », « 99+ »
  */
 import { format as dfFormat, formatDistanceStrict, isToday, isYesterday, isValid } from "date-fns";
 import { fr } from "date-fns/locale";
+import { formatRelative as coreFormatRelative } from "@mountain-live/core";
 
 export { formatDistance, formatTime, formatUntil, formatDuration, formatTtl } from "@mountain-live/core";
 
@@ -21,14 +25,6 @@ export function toDate(input: DateLike | null | undefined): Date | null {
   return isValid(d) ? d : null;
 }
 
-/** Abréviations des unités renvoyées par date-fns (fr). */
-const SHORT_UNITS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\bsecondes?\b/, "s"],
-  [/\bminutes?\b/, "min"],
-  [/\bheures?\b/, "h"],
-  [/\bjours?\b/, "j"],
-];
-
 export interface FormatRelativeOptions {
   /** Référence temporelle (par défaut : maintenant). */
   now?: Date;
@@ -40,7 +36,8 @@ export interface FormatRelativeOptions {
 
 /**
  * Date relative : « à l'instant », « il y a 35 min », « il y a 2 h », « dans 3 j ».
- * Retourne une chaîne vide pour une date invalide.
+ * Le style court est celui de @mountain-live/core (cohérent avec l'API) ;
+ * le style long donne « il y a 35 minutes ». Chaîne vide pour une date invalide.
  */
 export function formatRelative(date: DateLike | null | undefined, opts: FormatRelativeOptions = {}): string {
   const d = toDate(date);
@@ -48,15 +45,12 @@ export function formatRelative(date: DateLike | null | undefined, opts: FormatRe
   const now = opts.now ?? new Date();
   const diffMs = now.getTime() - d.getTime();
   if (Math.abs(diffMs) < 45_000) return "à l'instant";
-  let out = formatDistanceStrict(d, now, {
-    locale: fr,
-    addSuffix: opts.addSuffix ?? true,
-    roundingMethod: "floor",
-  });
+  const addSuffix = opts.addSuffix ?? true;
   if ((opts.style ?? "short") === "short") {
-    for (const [re, abbr] of SHORT_UNITS) out = out.replace(re, abbr);
+    const out = coreFormatRelative(d, now);
+    return addSuffix ? out : out.replace(/^il y a |^dans /, "");
   }
-  return out;
+  return formatDistanceStrict(d, now, { locale: fr, addSuffix, roundingMethod: "floor" });
 }
 
 export interface FormatDateTimeOptions {

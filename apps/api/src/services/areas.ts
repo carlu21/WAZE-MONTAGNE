@@ -1,12 +1,12 @@
 import { and, gte, lte, sql } from "drizzle-orm";
-import { haversineM, inBBox, type BBox, type LatLng } from "@mountain-live/core";
+import { bboxFromCenter, haversineM, inBBox, type BBox, type LatLng } from "@mountain-live/core";
 import { db } from "../db/client";
 import { areas, type AreaRow } from "../db/schema";
-import { bboxAround, normalizeText } from "./util";
+import { normalizeText } from "./util";
 
 /** Lieu de référence le plus proche (commune, massif, sommet…) dans un rayon donné. */
 export function nearestArea(p: LatLng, maxDistanceM: number): { area: AreaRow; distanceM: number } | null {
-  const box = bboxAround(p, maxDistanceM);
+  const box = bboxFromCenter(p, maxDistanceM);
   const candidates = db
     .select()
     .from(areas)
@@ -26,7 +26,7 @@ export function deriveZoneName(p: LatLng, maxDistanceM: number): string | null {
   if (!nearest) return null;
   // On privilégie une commune ou un massif quand un tel lieu est à portée raisonnable :
   // c'est plus parlant qu'un refuge ou un lac, sans pour autant être trop loin.
-  const box = bboxAround(p, maxDistanceM);
+  const box = bboxFromCenter(p, maxDistanceM);
   const named = db
     .select()
     .from(areas)
@@ -93,5 +93,5 @@ export function listAreasInBBox(box: BBox): AreaRow[] {
 
 /** Boîte englobante d'un lieu : sa bbox déclarée ou un rayon par défaut autour du centre. */
 export function areaBBox(area: AreaRow, fallbackRadiusM: number): BBox {
-  return area.bbox ?? bboxAround({ lat: area.lat, lng: area.lng }, fallbackRadiusM);
+  return area.bbox ?? bboxFromCenter({ lat: area.lat, lng: area.lng }, fallbackRadiusM);
 }

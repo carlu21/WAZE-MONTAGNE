@@ -52,6 +52,37 @@ avec photos de démonstration générées dans `uploads/demo/`.
 | `RATE_LIMIT_REPORTS_MAX` | `20`                              | Créations de signalement / 10 min / IP                 |
 | `RATE_LIMIT_DISABLED`  | —                                   | `1` désactive les limites (tests)                      |
 
+## Routes principales
+
+Préfixe `/api/v1`, corps et réponses JSON, dates ISO 8601 (UTC), authentification `Authorization: Bearer <jwt>`.
+Paramètres et formes de réponse détaillés : `packages/core/src/api-contract.ts` (types) et
+`packages/core/src/schemas.ts` (validation zod, partagée avec le front).
+
+| Méthode | Route | Auth | Rôle |
+| --- | --- | --- | --- |
+| GET | `/health`, `/taxonomy` | — | Santé ; catégories et sous-types (libellés, durées, icônes) |
+| POST | `/auth/register`, `/auth/login` | — | Création de compte, connexion → `{ token, user }` |
+| GET | `/auth/me` | oui | Profil complet, préférences incluses |
+| PATCH / PUT / DELETE | `/users/me`, `/users/me/preferences`, `/users/me` | oui | Profil, préférences, suppression RGPD (204) |
+| GET | `/users/:id` | — | Profil public (jamais l'e-mail ni le score brut) |
+| GET | `/reports?bbox&categories&source&since&lat&lng&limit` | facultative | Signalements visibles + alertes officielles ; `distanceM` si `lat`/`lng`, `myConfirmation` si connecté ; `includeInactive=1` réservé aux modérateurs |
+| POST | `/reports` | oui | Création (201 ; 200 si le `clientId` est déjà connu) |
+| GET | `/reports/:id?lat&lng` | facultative | Fiche : signalement, commentaires, votes, auteur public |
+| PATCH | `/reports/:id` | auteur ou modérateur | Description, niveau, fin, sous-type, `status` (`active` / `resolved`) |
+| POST | `/reports/:id/confirm` | oui | Vote `still_present` / `improved` / `gone` / `disputed` (un par utilisateur, modifiable) |
+| GET / POST | `/reports/:id/comments` | facultative / oui | Commentaires |
+| POST | `/reports/:id/photos` | oui | Multipart, champ `photo` (JPEG, PNG, WebP ; 5 Mo) |
+| POST | `/flags` | oui | Signaler un contenu (signalement, commentaire ou photo) |
+| GET | `/around?lat&lng&radius&categories` | facultative | Autour de moi : signalements et points d'eau triés par distance |
+| GET | `/areas/search?q`, `/areas/:id` | — / facultative | Recherche de lieux (accents et casse ignorés), fiche de lieu |
+| GET | `/trails?bbox`, `/water-points?bbox`, `/alerts/official?bbox` | — | Sentiers, points d'eau, alertes officielles |
+| POST / GET | `/presence` | facultative / — | Ping anonyme `{ lat, lng }` (204) ; cellules agrégées d'une bbox |
+| GET / POST | `/notifications`, `/notifications/:id/read`, `/notifications/read-all` | oui | Notifications de l'utilisateur |
+| GET | `/offline/bundle?bbox` | facultative | Paquet hors connexion (signalements, alertes, sentiers, eau, lieux) |
+| GET | `/community/activity` | facultative | Derniers signalements, meilleurs contributeurs, partenaires |
+| GET / PATCH / DELETE | `/admin/stats`, `/admin/reports`, `/admin/flags`, `/admin/users`, `/admin/users/:id/suspend`, `/admin/alerts` | moderator / admin | Back-office de modération (pages de 20, `total` renvoyé) |
+| GET | `/pro/dashboard?areaId&from&to` | official / partner / admin | Tableau de bord professionnel (30 derniers jours par défaut) |
+
 ## Points d'attention
 
 - **Confidentialité** : les coordonnées exactes d'un signalement sensible (espèces) restent en base ;

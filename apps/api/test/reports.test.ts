@@ -147,4 +147,47 @@ describe("Signalements", () => {
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("validation_error");
   });
+
+  it("refuse une heure de fin déjà passée ou antérieure au début", async () => {
+    const user = await registerUser(app);
+    const past = new Date(Date.now() - 3_600_000).toISOString();
+    const gone = await call<{ error: { code: string; details: { path: string }[] } }>(app, "POST", "/reports", {
+      token: user.token,
+      body: { subtype: "battue", lat: 42.3, lng: 9.15, endsAt: past },
+    });
+    expect(gone.status).toBe(400);
+    expect(gone.body.error.code).toBe("validation_error");
+    expect(gone.body.error.details[0].path).toBe("endsAt");
+
+    const start = new Date(Date.now() + 7_200_000).toISOString();
+    const end = new Date(Date.now() + 3_600_000).toISOString();
+    const inverted = await call<{ error: { code: string } }>(app, "POST", "/reports", {
+      token: user.token,
+      body: { subtype: "battue", lat: 42.3, lng: 9.15, startsAt: start, endsAt: end },
+    });
+    expect(inverted.status).toBe(400);
+    expect(inverted.body.error.code).toBe("validation_error");
+  });
+
+  it("n'inclut les signalements inactifs (includeInactive) que pour les modérateurs", async () => {
+    const author = await registerUser(app);
+    const moderator = await registerUser(app, { role: "moderator" });
+    const created = await call<{ report: Report }>(app, "POST", "/reports", {
+      token: author.token,
+      body: { subtype: "snow", lat: 42.9, lng: 9.4, dangerLevel: "low" },
+    });
+    const id = created.body.report.id;
+    await call(app, "PATCH", `/reports/${id}`, { token: author.token, body: { status: "resolved" } });
+
+    const query = "/reports?bbox=9.3,42.8,9.5,43.0&includeInactive=1";
+    const anonymous = await call<{ reports: Report[] }>(app, "GET", query);
+    expect(anonymous.body.reports.some((r) => r.id === id)).toBe(false);
+    const asAuthor = await call<{ reports: Report[] }>(app, "GET", query, { token: author.token });
+    expect(asAuthor.body.reports.some((r) => r.id === id)).toBe(false);
+    const asModerator = await call<{ reports: Report[] }>(app, "GET", query, { token: moderator.token });
+    expect(asModerator.body.reports.find((r) => r.id === id)?.status).toBe("resolved");
+    // La chaîne « false » ne doit pas activer l'option.
+    const off = await call<{ reports: Report[] }>(app, "GET", "/reports?bbox=9.3,42.8,9.5,43.0&includeInactive=false", { token: moderator.token });
+    expect(off.body.reports.some((r) => r.id === id)).toBe(false);
+  });
 });

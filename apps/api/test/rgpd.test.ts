@@ -53,6 +53,7 @@ describe("Suppression de compte (RGPD)", () => {
 
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ?").get(user.id)).toEqual({ n: 0 });
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM user_preferences WHERE user_id = ?").get(user.id)).toEqual({ n: 0 });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM user_reputation_events WHERE user_id = ?").get(user.id)).toEqual({ n: 0 });
 
     // Un nouveau compte peut réutiliser le pseudo libéré ; deux comptes supprimés peuvent coexister.
     const second = await registerUser(app);

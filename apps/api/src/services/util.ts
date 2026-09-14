@@ -15,23 +15,6 @@ export function normalizeText(s: string): string {
     .trim();
 }
 
-/** Boîte englobante approximative autour d'un point (rayon en mètres). */
-export function bboxAround(center: LatLng, radiusM: number): BBox {
-  const dLat = radiusM / 111_320;
-  const cos = Math.max(0.05, Math.cos((center.lat * Math.PI) / 180));
-  const dLng = radiusM / (111_320 * cos);
-  return {
-    west: center.lng - dLng,
-    south: center.lat - dLat,
-    east: center.lng + dLng,
-    north: center.lat + dLat,
-  };
-}
-
-export function bboxIntersects(a: BBox, b: BBox): boolean {
-  return a.west <= b.east && a.east >= b.west && a.south <= b.north && a.north >= b.south;
-}
-
 /** Enveloppe et centroïde d'une géométrie GeoJSON (Point, LineString, Polygon). */
 export function geometryExtent(g: GeoJsonGeometry): { bbox: BBox; centroid: LatLng } {
   const points: [number, number][] =
@@ -56,10 +39,6 @@ export function geometryExtent(g: GeoJsonGeometry): { bbox: BBox; centroid: LatL
 
 export function parseBool(v: string | undefined): boolean {
   return v === "1" || v === "true" || v === "yes";
-}
-
-export function addMinutes(d: Date, minutes: number): Date {
-  return new Date(d.getTime() + minutes * 60_000);
 }
 
 export function formatDateFr(iso: string): string {

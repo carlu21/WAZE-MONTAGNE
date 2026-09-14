@@ -35,7 +35,7 @@ import {
   updateReport,
 } from "../services/reports";
 import { toComment, toConfirmation, toOfficialAlert, toPhoto, toUserPublic } from "../services/serializers";
-import { newId, nowIso } from "../services/util";
+import { newId, nowIso, parseBool } from "../services/util";
 
 /**
  * /reports : liste, détail, création, mise à jour, votes, commentaires, photos.
@@ -64,8 +64,11 @@ reportsRoutes.get("/", optionalAuth, (c) => {
   const q = readQuery(c, listReportsQuerySchema);
   const viewer = c.get("user");
   const now = new Date();
+  // `includeInactive` (expirés, résolus…) est réservé aux modérateurs. Lu en brut car
+  // `z.coerce.boolean()` considère la chaîne « false » comme vraie.
+  const includeInactive = isModerator(viewer) && parseBool(c.req.query("includeInactive"));
   const rows = listVisibleReports(
-    { bbox: q.bbox, categories: q.categories as ReportCategory[] | undefined, source: q.source, since: q.since, limit: q.limit },
+    { bbox: q.bbox, categories: q.categories as ReportCategory[] | undefined, source: q.source, since: q.since, limit: q.limit, includeInactive },
     now,
   );
   const body: ListReportsResponse = {
@@ -82,6 +85,12 @@ reportsRoutes.post("/", requireAuth, rateLimit({ name: "create-report", ...confi
   if (input.startsAt && input.endsAt && Date.parse(input.endsAt) <= Date.parse(input.startsAt)) {
     throw new HttpError(400, "validation_error", "L'heure de fin doit être postérieure à l'heure de début", [
       { path: "endsAt", message: "Doit être postérieure à startsAt" },
+    ]);
+  }
+  // Une fin déjà passée produirait un signalement invisible dès sa création.
+  if (input.endsAt && Date.parse(input.endsAt) <= Date.now()) {
+    throw new HttpError(400, "validation_error", "L'heure de fin doit être dans le futur", [
+      { path: "endsAt", message: "Doit être postérieure à maintenant" },
     ]);
   }
   const { row, created } = createReport(user, { ...input, subtype: input.subtype as ReportSubtype });
