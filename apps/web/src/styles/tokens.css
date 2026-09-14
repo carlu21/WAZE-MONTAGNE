@@ -1,72 +1,330 @@
 /*
- * Design tokens — Mountain Live (section 19).
- * Palette : vert forêt, vert profond, beige naturel, blanc cassé, gris roche,
- * orange sécurité, rouge danger (rouge réservé aux alertes importantes).
- * La tâche "design-system" complète et documente ces tokens.
+ * Design tokens — Mountain Live (sections 19, 20 et 31 du cahier des charges).
+ *
+ * Trois niveaux :
+ *  1. Palette brute (@theme --color-*) : vert forêt, vert profond, beige naturel,
+ *     blanc cassé, gris roche, orange sécurité, rouge danger, bleu eau, or (officiel).
+ *     À ne PAS utiliser directement dans les composants.
+ *  2. Tokens sémantiques (:root --bg, --fg, --primary, --danger…) : ce sont eux qui
+ *     changent entre le mode clair et le mode sombre (html[data-theme]).
+ *  3. Exposition Tailwind (@theme inline) : `bg-surface`, `text-muted`, `bg-primary`,
+ *     `border-line`, `text-danger`, `shadow-md`… résolus à l'exécution, donc
+ *     compatibles avec le mode sombre sans variantes `dark:`.
+ *
+ * Règle d'or : le ROUGE (--danger) est réservé aux alertes importantes et aux
+ * actions destructrices. L'orange sécurité (--accent) porte l'action principale
+ * « Signaler » et les avertissements. Le vert forêt (--primary) porte la marque.
  */
 @theme {
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-forest-900: #14351B;
-  --color-forest-800: #1F4D28;
-  --color-forest-700: #2F6B3A;
-  --color-forest-500: #4F8A5B;
-  --color-forest-200: #C9DDCB;
-  --color-sand-50: #F9F7F1;
-  --color-sand-100: #F4F1EA;
-  --color-sand-200: #E8E2D4;
-  --color-rock-900: #1E2429;
-  --color-rock-700: #3E4A54;
-  --color-rock-500: #5B6B7A;
-  --color-rock-300: #A9B3BC;
-  --color-rock-100: #E5E9ED;
-  --color-safety-500: #D9822B;
-  --color-danger-600: #C8341F;
-  --color-water-500: #1D6FA5;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Vert forêt / vert profond */
+  --color-forest-950: #0e2412;
+  --color-forest-900: #14351b;
+  --color-forest-800: #1f4d28;
+  --color-forest-700: #2f6b3a;
+  --color-forest-600: #3c7a48;
+  --color-forest-500: #4f8a5b;
+  --color-forest-300: #8fbf98;
+  --color-forest-200: #c9ddcb;
+  --color-forest-100: #e4efe5;
+
+  /* Beige naturel / blanc cassé */
+  --color-sand-50: #f9f7f1;
+  --color-sand-100: #f4f1ea;
+  --color-sand-200: #e8e2d4;
+  --color-sand-300: #d9d0bd;
+
+  /* Gris roche */
+  --color-rock-900: #1e2429;
+  --color-rock-800: #2c353d;
+  --color-rock-700: #3e4a54;
+  --color-rock-500: #5b6b7a;
+  --color-rock-400: #7a8894;
+  --color-rock-300: #a9b3bc;
+  --color-rock-200: #cfd6dc;
+  --color-rock-100: #e5e9ed;
+
+  /* Orange sécurité */
+  --color-safety-600: #b9691c;
+  --color-safety-500: #d9822b;
+  --color-safety-100: #fbebd9;
+
+  /* Rouge danger — alertes importantes uniquement */
+  --color-danger-700: #a32a18;
+  --color-danger-600: #c8341f;
+  --color-danger-100: #f9e1dd;
+
+  /* Bleu eau */
+  --color-water-600: #175a86;
+  --color-water-500: #1d6fa5;
+  --color-water-100: #ddebf5;
+
+  /* Or — liseré des sources officielles */
+  --color-gold-500: #c9a227;
+  --color-gold-100: #f6edcc;
+
+  /* Rayons : boutons 12–14 px, cartes 14–20 px, feuilles 24 px */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+}
+
+/* Tokens sémantiques exposés à Tailwind (résolus à l'exécution → mode sombre gratuit). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-subtle: var(--fg-subtle);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-fg: var(--primary-soft-fg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-water: var(--water);
+  --color-gold: var(--gold);
+  --color-gold-fg: var(--gold-fg);
+  --color-gold-soft: var(--gold-soft);
+  --color-ring: var(--ring);
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+  --shadow-fab: var(--elev-fab);
 }
 
 :root {
-  --bg: var(--color-sand-100);
-  --bg-elev: #FFFFFF;
-  --fg: var(--color-rock-900);
-  --fg-muted: var(--color-rock-500);
-  --border: var(--color-sand-200);
-  --primary: var(--color-forest-800);
-  --primary-fg: #FFFFFF;
-  --accent: var(--color-safety-500);
-  --c-danger: #C8341F;
-  --c-path: #D9822B;
-  --c-activity: #B45309;
-  --c-animals: #6B4F2A;
-  --c-water: #1D6FA5;
-  --c-crowd: #5B6B7A;
+  /* Fonds et surfaces */
+  --bg: #f4f1ea;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f9f7f1;
+  /* Surcouches translucides posées sur la carte (barre haute, navigation, boutons flottants) */
+  --surface-glass: rgba(249, 247, 241, 0.82);
+  --surface-glass-strong: rgba(249, 247, 241, 0.94);
+  --scrim: rgba(20, 30, 20, 0.35);
+
+  /* Texte */
+  --fg: #1e2429;
+  --fg-muted: #5b6b7a;
+  --fg-subtle: #7a8894;
+  --border: #e8e2d4;
+  --border-strong: #cfc6b2;
+
+  /* Marque */
+  --primary: #1f4d28;
+  --primary-hover: #14351b;
+  --primary-fg: #ffffff;
+  --primary-soft: #e4efe5;
+  --primary-soft-fg: #14351b;
+
+  /* Action principale « Signaler » et avertissements */
+  --accent: #d9822b;
+  --accent-hover: #b9691c;
+  --accent-fg: #ffffff;
+  --accent-soft: #fbebd9;
+
+  /* Rouge : alertes importantes et actions destructrices uniquement */
+  --danger: #c8341f;
+  --danger-hover: #a32a18;
+  --danger-fg: #ffffff;
+  --danger-soft: #f9e1dd;
+
+  --success: #2f6b3a;
+  --success-soft: #e4efe5;
+  --warning: #b9691c;
+  --warning-soft: #fbebd9;
+  --info: #1d6fa5;
+  --info-soft: #ddebf5;
+  --water: #1d6fa5;
+  --gold: #c9a227;
+  --gold-fg: #6f5310;
+  --gold-soft: #f6edcc;
+  --ring: #2f6b3a;
+
+  /* Couleurs de catégorie (taxonomie : CATEGORIES[].colorVar) */
+  --c-danger: #c8341f;
+  --c-path: #d9822b;
+  --c-activity: #b45309;
+  --c-animals: #6b4f2a;
+  --c-water: #1d6fa5;
+  --c-crowd: #5b6b7a;
+  --c-official: #c9a227;
+
+  /* Ombres */
+  --elev-sm: 0 1px 2px rgba(20, 30, 20, 0.08), 0 1px 1px rgba(20, 30, 20, 0.04);
+  --elev-md: 0 4px 12px rgba(20, 30, 20, 0.12), 0 2px 4px rgba(20, 30, 20, 0.06);
+  --elev-lg: 0 12px 32px rgba(20, 30, 20, 0.18), 0 4px 8px rgba(20, 30, 20, 0.08);
+  --elev-fab: 0 8px 24px rgba(217, 130, 43, 0.45), 0 2px 6px rgba(20, 30, 20, 0.2);
+
+  /* Zones sûres (encoche, barre d'accueil) */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Dimensions de la coquille */
   --nav-height: 64px;
+  --topbar-height: 56px;
+  --fab-size: 64px;
+  --sidebar-width: 88px;
+  /* Cibles tactiles : 48 px minimum, 56 px pour les actions principales (gants) */
+  --touch: 48px;
+  --touch-lg: 56px;
+  /* Encombrement de la coquille (mis à jour par AppShell) : espace à réserver
+     en bas (barre de navigation + zone sûre) et à gauche (barre latérale). */
+  --shell-top: var(--safe-top);
+  --shell-bottom: var(--safe-bottom);
+  --shell-left: 0px;
+
+  /* Plans d'empilement */
+  --z-map: 0;
+  --z-overlay: 10;
+  --z-sheet: 20;
+  --z-nav: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Typographie : base 16 px, boutons 17 px */
+  --font-size-base: 16px;
+  --font-size-button: 17px;
+
+  /* Mouvement */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   color-scheme: light;
 }
 
+/* ---------- Mode sombre complet ---------- */
 :root[data-theme="dark"] {
-  --bg: #0F1613;
-  --bg-elev: #17211C;
-  --fg: #F1F3EE;
-  --fg-muted: #A9B3AC;
-  --border: #2A362F;
-  --primary: #4F8A5B;
-  --primary-fg: #0F1613;
+  --bg: #0f1613;
+  --bg-elev: #17211c;
+  --surface: #17211c;
+  --surface-2: #1e2a23;
+  --surface-glass: rgba(15, 22, 19, 0.8);
+  --surface-glass-strong: rgba(15, 22, 19, 0.93);
+  --scrim: rgba(0, 0, 0, 0.55);
+
+  --fg: #f1f3ee;
+  --fg-muted: #a9b3ac;
+  --fg-subtle: #7f8b83;
+  --border: #2a362f;
+  --border-strong: #3a4840;
+
+  --primary: #4f8a5b;
+  --primary-hover: #5e9c6a;
+  --primary-fg: #0f1613;
+  --primary-soft: #1d3324;
+  --primary-soft-fg: #c9ddcb;
+
+  --accent: #e8944a;
+  --accent-hover: #f0a45f;
+  --accent-fg: #1a120a;
+  --accent-soft: #3a2612;
+
+  --danger: #e0533d;
+  --danger-hover: #ea6a56;
+  --danger-fg: #ffffff;
+  --danger-soft: #3d1a14;
+
+  --success: #5e9c6a;
+  --success-soft: #1d3324;
+  --warning: #e8944a;
+  --warning-soft: #3a2612;
+  --info: #4a93c7;
+  --info-soft: #14283a;
+  --water: #4a93c7;
+  --gold: #d9b546;
+  --gold-fg: #ead27a;
+  --gold-soft: #3a3112;
+  --ring: #8fbf98;
+
+  --c-danger: #e0533d;
+  --c-path: #e8944a;
+  --c-activity: #d97b2e;
+  --c-animals: #a8804f;
+  --c-water: #4a93c7;
+  --c-crowd: #8c9ba8;
+  --c-official: #d9b546;
+
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --elev-lg: 0 12px 32px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.35);
+  --elev-fab: 0 8px 24px rgba(232, 148, 74, 0.35), 0 2px 6px rgba(0, 0, 0, 0.5);
+
   color-scheme: dark;
 }
+
+/* Avant l'exécution de src/lib/theme.ts (premier rendu), on suit le système. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0F1613;
-    --bg-elev: #17211C;
-    --fg: #F1F3EE;
-    --fg-muted: #A9B3AC;
-    --border: #2A362F;
-    --primary: #4F8A5B;
-    --primary-fg: #0F1613;
+  :root:not([data-theme]) {
+    --bg: #0f1613;
+    --bg-elev: #17211c;
+    --surface: #17211c;
+    --surface-2: #1e2a23;
+    --surface-glass: rgba(15, 22, 19, 0.8);
+    --surface-glass-strong: rgba(15, 22, 19, 0.93);
+    --scrim: rgba(0, 0, 0, 0.55);
+    --fg: #f1f3ee;
+    --fg-muted: #a9b3ac;
+    --fg-subtle: #7f8b83;
+    --border: #2a362f;
+    --border-strong: #3a4840;
+    --primary: #4f8a5b;
+    --primary-hover: #5e9c6a;
+    --primary-fg: #0f1613;
+    --primary-soft: #1d3324;
+    --primary-soft-fg: #c9ddcb;
+    --accent: #e8944a;
+    --accent-hover: #f0a45f;
+    --accent-fg: #1a120a;
+    --accent-soft: #3a2612;
+    --danger: #e0533d;
+    --danger-hover: #ea6a56;
+    --danger-soft: #3d1a14;
+    --success: #5e9c6a;
+    --success-soft: #1d3324;
+    --warning: #e8944a;
+    --warning-soft: #3a2612;
+    --info: #4a93c7;
+    --info-soft: #14283a;
+    --water: #4a93c7;
+    --gold: #d9b546;
+    --gold-fg: #ead27a;
+    --gold-soft: #3a3112;
+    --ring: #8fbf98;
+    --c-danger: #e0533d;
+    --c-path: #e8944a;
+    --c-activity: #d97b2e;
+    --c-animals: #a8804f;
+    --c-water: #4a93c7;
+    --c-crowd: #8c9ba8;
+    --c-official: #d9b546;
     color-scheme: dark;
   }
 }

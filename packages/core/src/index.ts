@@ -5,4 +5,6 @@ export * from "./api-contract";
 export * from "./lifecycle";
 export * from "./confidence";
 export * from "./geo";
+export * from "./reputation";
+export * from "./time";
 export * from "./i18n";

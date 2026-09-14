@@ -2,17 +2,429 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "./tokens.css";
 
-/* Base */
-html, body, #root { height: 100%; }
+/* ---------- Base ---------- */
+html,
+body,
+#root {
+  height: 100%;
+}
+html {
+  font-size: var(--font-size-base);
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-* { box-sizing: border-box; }
-button, input, select, textarea { font: inherit; color: inherit; }
-img { max-width: 100%; display: block; }
+* {
+  box-sizing: border-box;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+img {
+  max-width: 100%;
+  display: block;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+::selection {
+  background: var(--primary-soft);
+  color: var(--primary-soft-fg);
+}
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* Lien d'évitement (accessibilité) */
+.skip-link {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  left: 8px;
+  z-index: 100;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-weight: 600;
+  transform: translateY(-200%);
+  transition: transform var(--dur) var(--ease);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ---------- Utilitaires ---------- */
+/* Surface translucide floutée (barre haute, navigation, boutons sur carte) */
+.glass {
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+.glass-strong {
+  background: var(--surface-glass-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: var(--surface-glass-strong);
+  }
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.touch {
+  min-height: var(--touch);
+  min-width: var(--touch);
+}
+.touch-lg {
+  min-height: var(--touch-lg);
+  min-width: var(--touch-lg);
+}
+.safe-pt {
+  padding-top: var(--safe-top);
+}
+.safe-pb {
+  padding-bottom: var(--safe-bottom);
+}
+/* Espace réservé sous le contenu pour la barre de navigation */
+.shell-pb {
+  padding-bottom: calc(var(--shell-bottom) + 16px);
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ---------- Animations ---------- */
+@keyframes ml-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ml-slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes ml-slide-down {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes ml-scale-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes ml-drawer-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes ml-drawer-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes ml-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes ml-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(217, 130, 43, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(217, 130, 43, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 130, 43, 0);
+  }
+}
+.anim-fade-in {
+  animation: ml-fade-in var(--dur) var(--ease) both;
+}
+.anim-slide-up {
+  animation: ml-slide-up var(--dur-slow) var(--ease) both;
+}
+.anim-slide-down {
+  animation: ml-slide-down var(--dur) var(--ease) both;
+}
+.anim-scale-in {
+  animation: ml-scale-in var(--dur) var(--ease) both;
+}
+
+/* ---------- Composants nécessitant du CSS natif ---------- */
+
+/* Squelette de chargement */
+.ml-skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: ml-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Puce de filtre / catégorie : couleur pilotée par --chip-color */
+.ml-chip {
+  --chip-color: var(--primary);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+}
+.ml-chip[aria-pressed="true"],
+.ml-chip[aria-checked="true"],
+.ml-chip[data-selected="true"] {
+  border-color: var(--chip-color);
+  background: color-mix(in srgb, var(--chip-color) 16%, var(--surface));
+  color: color-mix(in srgb, var(--chip-color) 80%, var(--fg));
+}
+:root[data-theme="dark"] .ml-chip[aria-pressed="true"],
+:root[data-theme="dark"] .ml-chip[aria-checked="true"],
+:root[data-theme="dark"] .ml-chip[data-selected="true"] {
+  background: color-mix(in srgb, var(--chip-color) 26%, var(--surface));
+  color: color-mix(in srgb, var(--chip-color) 40%, var(--fg));
+}
+
+/* Tuile de catégorie / sous-type : couleur pilotée par --tile-color */
+.ml-tile {
+  --tile-color: var(--primary);
+  border: 2px solid var(--border);
+  background: var(--surface);
+}
+.ml-tile[aria-pressed="true"] {
+  border-color: var(--tile-color);
+  background: color-mix(in srgb, var(--tile-color) 10%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tile-color) 25%, transparent);
+}
+.ml-tile__disc {
+  background: color-mix(in srgb, var(--tile-color) 16%, var(--surface));
+  color: var(--tile-color);
+}
+.ml-tile[aria-pressed="true"] .ml-tile__disc {
+  background: var(--tile-color);
+  color: #fff;
+}
+
+/* Interrupteur */
+.ml-switch {
+  position: relative;
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color var(--dur) var(--ease);
+  flex: none;
+}
+.ml-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--dur) var(--ease);
+}
+.ml-switch[aria-checked="true"] {
+  background: var(--primary);
+}
+.ml-switch[aria-checked="true"]::after {
+  transform: translateX(20px);
+}
+.ml-switch:disabled {
+  opacity: 0.5;
+}
+
+/* Curseur (rayon d'alerte) : gros pouce de 28 px, piste remplie via --fill */
+.ml-range {
+  --fill: 0%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 48px;
+  background: transparent;
+  margin: 0;
+}
+.ml-range:focus-visible {
+  outline: none;
+}
+.ml-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--primary) 0 var(--fill), var(--border-strong) var(--fill) 100%);
+}
+.ml-range::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+.ml-range::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.ml-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 3px solid var(--primary);
+  box-shadow: var(--elev-md);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.ml-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 3px solid var(--primary);
+  box-shadow: var(--elev-md);
+}
+.ml-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--ring) 35%, transparent);
+}
+.ml-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--ring) 35%, transparent);
+}
+.ml-range:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+.ml-range:disabled {
+  opacity: 0.5;
+}
+
+/* Feuille basse : poignée */
+.ml-sheet-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+/* Barre de navigation : élément actif */
+.ml-nav-item {
+  color: var(--fg-muted);
+  transition: color var(--dur-fast) var(--ease);
+}
+.ml-nav-item[aria-current="page"] {
+  color: var(--primary);
+}
+.ml-nav-item__icon {
+  border-radius: 999px;
+  transition:
+    background-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.ml-nav-item[aria-current="page"] .ml-nav-item__icon {
+  background: var(--primary-soft);
+}
+.ml-nav-item:active .ml-nav-item__icon {
+  transform: scale(0.92);
+}
+
+/* Bouton flottant « + Signaler » : halo pulsant discret */
+.ml-fab-halo {
+  animation: ml-pulse-ring 2.6s var(--ease) infinite;
+}
+
+/* MapLibre : attribution lisible et compacte, contrôles arrondis */
+.maplibregl-ctrl-attrib {
+  font-size: 11px;
+  background: var(--surface-glass) !important;
+  color: var(--fg-muted) !important;
+  border-radius: var(--radius-sm) 0 0 0;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--fg-muted) !important;
+}
+.maplibregl-ctrl-group {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--elev-md) !important;
+  background: var(--surface-glass-strong) !important;
+}
+.maplibregl-popup-content {
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--elev-lg);
+  font-family: var(--font-sans);
+}
+
+/* ---------- Mouvement réduit ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ml-fab-halo {
+    animation: none;
+  }
+}

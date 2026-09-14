@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:reset": "rm -f data/mountain-live.db && tsx src/db/migrate.ts && tsx src/db/seed.ts"
+    "db:reset": "rm -f data/mountain-live.db data/mountain-live.db-wal data/mountain-live.db-shm && tsx src/db/migrate.ts && tsx src/db/seed.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",
