@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "./helpers"; // base SQLite temporaire (DATABASE_PATH) avant tout import de la base
 import { config } from "../src/config";
 import { geocodeOnline } from "../src/services/geocoder";
 

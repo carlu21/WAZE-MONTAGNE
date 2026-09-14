@@ -63,7 +63,18 @@ export function searchAreas(query: string, limit = 15): AreaRow[] {
     .where(sql`${areas.nameNormalized} LIKE ${`%${escaped}%`} ESCAPE '\\'`)
     .limit(60)
     .all();
-  return sortAreaResults(rows, q).slice(0, limit);
+  return dedupeAreaRows(sortAreaResults(rows, q)).slice(0, limit);
+}
+
+/** Supprime les doublons (même nom normalisé à moins d'un kilomètre), en gardant le premier dans l'ordre de tri. */
+export function dedupeAreaRows<T extends Pick<AreaRow, "name" | "lat" | "lng">>(rows: readonly T[]): T[] {
+  const kept: T[] = [];
+  for (const row of rows) {
+    const key = normalizeText(row.name);
+    const duplicate = kept.some((k) => normalizeText(k.name) === key && haversineM({ lat: k.lat, lng: k.lng }, { lat: row.lat, lng: row.lng }) < 1000);
+    if (!duplicate) kept.push(row);
+  }
+  return kept;
 }
 
 const TYPE_ORDER: Record<AreaRow["type"], number> = {
