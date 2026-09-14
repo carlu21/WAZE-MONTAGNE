@@ -276,6 +276,8 @@ export const areas = sqliteTable(
     bbox: text("bbox", { mode: "json" }).$type<BBox | null>(),
     elevation: integer("elevation"),
     description: text("description"),
+    /** Commune de rattachement (nom), pour distinguer les lieux-dits homonymes. */
+    commune: text("commune"),
   },
   (t) => [index("areas_name_idx").on(t.nameNormalized), index("areas_type_idx").on(t.type)],
 );

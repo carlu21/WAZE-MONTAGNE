@@ -268,6 +268,11 @@ const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS presence_pings_bucket_idx ON presence_pings(bucket_start)`,
     ],
   },
+  {
+    version: 2,
+    name: "commune de rattachement des lieux",
+    statements: [`ALTER TABLE areas ADD COLUMN commune TEXT`],
+  },
 ];
 
 /** Applique toutes les migrations manquantes. Sans effet si la base est à jour. */

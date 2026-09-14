@@ -53,7 +53,7 @@ export function deriveZoneName(p: LatLng, maxDistanceM: number): string | null {
  * Recherche insensible à la casse et aux accents (normalisation NFD), 15 résultats max,
  * les correspondances en début de nom d'abord.
  */
-export function searchAreas(query: string, limit = 15): AreaRow[] {
+export function searchAreas(query: string, limit = 15, origin: LatLng | null = null): AreaRow[] {
   const q = normalizeText(query);
   if (!q) return [];
   const escaped = q.replace(/[%_]/g, (m) => `\\${m}`);
@@ -63,7 +63,7 @@ export function searchAreas(query: string, limit = 15): AreaRow[] {
     .where(sql`${areas.nameNormalized} LIKE ${`%${escaped}%`} ESCAPE '\\'`)
     .limit(60)
     .all();
-  return dedupeAreaRows(sortAreaResults(rows, q)).slice(0, limit);
+  return dedupeAreaRows(sortAreaResults(rows, q, origin)).slice(0, limit);
 }
 
 /** Supprime les doublons (même nom normalisé à moins d'un kilomètre), en gardant le premier dans l'ordre de tri. */
@@ -90,19 +90,28 @@ const TYPE_ORDER: Record<AreaRow["type"], number> = {
   place: 9,
 };
 
-/** Tri commun : nom commençant par la requête d'abord, puis type, puis ordre alphabétique. */
-export function sortAreaResults<T extends Pick<AreaRow, "name" | "nameNormalized" | "type">>(rows: T[], normalizedQuery: string): T[] {
+/**
+ * Tri commun : nom commençant par la requête d'abord, puis type, puis — si la position de
+ * l'utilisateur est connue — du plus proche au plus éloigné (les lieux-dits homonymes de
+ * communes différentes sont ainsi départagés), sinon ordre alphabétique.
+ */
+export function sortAreaResults<T extends Pick<AreaRow, "name" | "nameNormalized" | "type" | "lat" | "lng">>(rows: T[], normalizedQuery: string, origin: LatLng | null = null): T[] {
   return rows.sort((a, b) => {
     const sa = a.nameNormalized.startsWith(normalizedQuery) ? 0 : 1;
     const sb = b.nameNormalized.startsWith(normalizedQuery) ? 0 : 1;
     if (sa !== sb) return sa - sb;
     if (TYPE_ORDER[a.type] !== TYPE_ORDER[b.type]) return TYPE_ORDER[a.type] - TYPE_ORDER[b.type];
+    if (origin) {
+      const da = haversineM(origin, { lat: a.lat, lng: a.lng });
+      const db_ = haversineM(origin, { lat: b.lat, lng: b.lng });
+      if (Math.abs(da - db_) > 500) return da - db_;
+    }
     return a.name.localeCompare(b.name, "fr");
   });
 }
 
 /** Fusion des résultats locaux et en ligne : un lieu en ligne est ignoré s'il double un lieu local (même nom à moins d'un kilomètre). */
-export function mergeAreaResults(local: readonly AreaRow[], online: readonly GeocodedPlace[], query: string, limit = 15): AreaRow[] {
+export function mergeAreaResults(local: readonly AreaRow[], online: readonly GeocodedPlace[], query: string, limit = 15, origin: LatLng | null = null): AreaRow[] {
   const q = normalizeText(query);
   const merged: AreaRow[] = [...local];
   for (const p of online) {
@@ -112,9 +121,9 @@ export function mergeAreaResults(local: readonly AreaRow[], online: readonly Geo
       return (an === key || an.startsWith(key) || key.startsWith(an)) && haversineM({ lat: a.lat, lng: a.lng }, { lat: p.lat, lng: p.lng }) < 1000;
     });
     if (duplicate) continue;
-    merged.push({ id: p.id, name: p.name, nameNormalized: p.nameNormalized, type: p.type, lat: p.lat, lng: p.lng, bbox: null, elevation: p.elevation, description: p.description });
+    merged.push({ id: p.id, name: p.name, nameNormalized: p.nameNormalized, type: p.type, lat: p.lat, lng: p.lng, bbox: null, elevation: p.elevation, description: p.description, commune: p.commune });
   }
-  return sortAreaResults(merged, q).slice(0, limit);
+  return sortAreaResults(merged, q, origin).slice(0, limit);
 }
 
 /**
@@ -123,12 +132,13 @@ export function mergeAreaResults(local: readonly AreaRow[], online: readonly Geo
  */
 export async function searchAreasWithFallback(query: string, opts: { lat?: number; lng?: number; limit?: number } = {}): Promise<AreaRow[]> {
   const limit = opts.limit ?? 15;
-  const local = searchAreas(query, limit);
+  const origin = opts.lat != null && opts.lng != null ? { lat: opts.lat, lng: opts.lng } : null;
+  const local = searchAreas(query, limit, origin);
   const q = normalizeText(query);
   if (!config.geocoder.enabled || q.length < 3 || local.length >= 8) return local;
   const online = await geocodeOnline(query, { lat: opts.lat, lng: opts.lng, limit: 10 });
   if (online.length === 0) return local;
-  return mergeAreaResults(local, online, query, limit);
+  return mergeAreaResults(local, online, query, limit, origin);
 }
 
 export function listAreasInBBox(box: BBox): AreaRow[] {

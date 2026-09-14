@@ -38,7 +38,7 @@ erDiagram
 | `official_alerts` | alertes officielles | `organisation`, `title`, `body`, `category`, `severity`, `geometry` (GeoJSON Point/Polygon), `centroid_lat/lng`, `starts_at`, `ends_at`, `url` |
 | `trails` | sentiers de référence | `type`, `difficulty`, `distance_km`, `elevation_gain_m`, `geometry` (LineString) |
 | `water_points` | sources, fontaines, lacs, refuges, abris | `type`, `last_state` (active, dry, unknown), `last_state_at`, `elevation` |
-| `areas` | lieux recherchables | `type` (commune, massif, trail, summit, pass, place, refuge, lake, hamlet, spring), `lat/lng`, `bbox`, `elevation`, `description`. Identifiants : `a_…` jeu de démonstration, `gn_<geonameid>` import GeoNames (`geo:import`), `g_…` lieux mémorisés depuis le géocodeur IGN |
+| `areas` | lieux recherchables | `type` (commune, massif, trail, summit, pass, place, refuge, lake, hamlet, spring), `lat/lng`, `bbox`, `elevation`, `description`, `commune` (commune de rattachement, pour distinguer les homonymes). Identifiants : `a_…` jeu de démonstration, `gn_<geonameid>` import GeoNames (`geo:import`), `g_…` lieux mémorisés depuis le géocodeur IGN |
 | `offline_zones` | zones téléchargées par un utilisateur (métadonnées) | `bbox`, `downloaded_at` |
 | `notifications` | notifications in-app | `type`, `title`, `body`, `report_id`, `read_at` |
 | `user_reputation_events` | journal interne de réputation | `kind`, `delta`, `report_id` |

@@ -49,9 +49,10 @@ export function areaTypeLabel(type: AreaType | string): string {
   return (AREA_TYPE_LABELS as Record<string, string>)[type] ?? "Lieu";
 }
 
-/** Sous-titre d'un lieu : « Sommet · 2 706 m ». */
+/** Sous-titre d'un lieu : « Lieu-dit · Corte · 1 370 m » (la commune distingue les homonymes). */
 export function areaSubtitle(area: Area, formatElevation: (m: number) => string): string {
   const parts = [areaTypeLabel(area.type)];
+  if (area.commune) parts.push(area.commune);
   if (area.elevation !== null && Number.isFinite(area.elevation)) parts.push(formatElevation(area.elevation));
   return parts.join(" · ");
 }

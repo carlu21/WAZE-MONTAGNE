@@ -181,6 +181,7 @@ export function toArea(row: AreaRow): Area {
     bbox: row.bbox ?? null,
     elevation: row.elevation ?? null,
     description: row.description ?? null,
+    commune: row.commune ?? null,
   };
 }
 

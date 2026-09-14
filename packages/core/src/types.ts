@@ -300,6 +300,8 @@ export interface Area {
   /** Altitude (m) pour sommets / cols / refuges. */
   elevation: number | null;
   description: string | null;
+  /** Commune de rattachement (distingue les lieux-dits homonymes). */
+  commune?: string | null;
 }
 
 export interface AreaSummary {

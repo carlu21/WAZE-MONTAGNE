@@ -19,6 +19,7 @@ export interface GeocodedPlace {
   lng: number;
   elevation: number | null;
   description: string | null;
+  commune: string | null;
 }
 
 interface Feature {
@@ -94,6 +95,7 @@ export function mapGeocoderFeature(f: Feature): GeocodedPlace | null {
     lng,
     elevation: null,
     description: parts.length ? `${parts.join(" · ")} · Source : IGN` : "Source : IGN",
+    commune: city && normalizeText(city) !== normalizeText(name) ? city : null,
   };
 }
 
@@ -144,7 +146,7 @@ export function rememberPlaces(places: readonly GeocodedPlace[]): void {
     db.transaction((tx) => {
       for (const p of places) {
         tx.insert(areas)
-          .values({ id: p.id, name: p.name, nameNormalized: p.nameNormalized, type: p.type, lat: p.lat, lng: p.lng, bbox: null, elevation: p.elevation, description: p.description })
+          .values({ id: p.id, name: p.name, nameNormalized: p.nameNormalized, type: p.type, lat: p.lat, lng: p.lng, bbox: null, elevation: p.elevation, description: p.description, commune: p.commune })
           .onConflictDoNothing()
           .run();
       }

@@ -20,6 +20,8 @@ export interface GeoNamesRecord {
   featureCode: string;
   admin1: string;
   admin2: string;
+  /** Code de la commune (INSEE) dans le découpage GeoNames de la France. */
+  admin4: string;
   elevation: number | null;
   dem: number | null;
 }
@@ -33,6 +35,16 @@ export interface ImportedArea {
   lng: number;
   elevation: number | null;
   description: string | null;
+  commune: string | null;
+}
+
+/** Table code INSEE (admin4) → nom de commune, construite à partir des entrées ADM4 du fichier. */
+export function collectCommuneNames(records: Iterable<GeoNamesRecord>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of records) {
+    if (r.featureClass === "A" && r.featureCode === "ADM4" && r.admin4 && r.name) map.set(r.admin4, r.name.trim());
+  }
+  return map;
 }
 
 /** Correspondance code GeoNames → type de lieu Mountain Live (null = ignoré). */
@@ -92,6 +104,7 @@ export function parseGeoNamesLine(line: string): GeoNamesRecord | null {
     featureCode: c[7],
     admin1: c[10],
     admin2: c[11],
+    admin4: c[13],
     elevation: Number.isFinite(elevation as number) ? (elevation as number) : null,
     dem: Number.isFinite(dem as number) ? (dem as number) : null,
   };
@@ -116,7 +129,7 @@ const TYPE_LABEL: Record<AreaType, string> = {
 };
 
 /** Transforme un enregistrement GeoNames en lieu importable ; null s'il est hors filtre ou sans type. */
-export function toImportedArea(r: GeoNamesRecord, filter: ImportFilter): ImportedArea | null {
+export function toImportedArea(r: GeoNamesRecord, filter: ImportFilter, communeNames: ReadonlyMap<string, string> = new Map()): ImportedArea | null {
   if (filter.departements.length > 0 && !filter.departements.includes(r.admin2)) return null;
   const type = areaTypeForFeature(r.featureClass, r.featureCode);
   if (!type) return null;
@@ -128,7 +141,11 @@ export function toImportedArea(r: GeoNamesRecord, filter: ImportFilter): Importe
     .map((s) => s.trim())
     .filter((s) => s && !/^https?:/.test(s) && s.length <= 60)
     .slice(0, 8);
-  const nameNormalized = normalizeText([name, ...alternates].join(" ")).slice(0, 300);
+  const communeName = communeNames.get(r.admin4) ?? null;
+  // La commune elle-même n'a pas de « commune de rattachement » ; les autres lieux y sont associés,
+  // et son nom participe à la recherche (« Grotelle Corte »).
+  const commune = communeName && normalizeText(communeName) !== normalizeText(name) ? communeName : null;
+  const nameNormalized = normalizeText([name, ...alternates, commune ?? ""].join(" ")).slice(0, 300);
   const elevation = r.elevation && r.elevation > 0 ? Math.round(r.elevation) : r.dem && r.dem > 0 && ["summit", "pass", "refuge", "lake", "spring", "hamlet"].includes(type) ? Math.round(r.dem) : null;
   return {
     id: `gn_${r.geonameid}`,
@@ -138,7 +155,8 @@ export function toImportedArea(r: GeoNamesRecord, filter: ImportFilter): Importe
     lat: r.lat,
     lng: r.lng,
     elevation,
-    description: `${TYPE_LABEL[type]} (GeoNames)${r.admin2 ? ` · département ${r.admin2}` : ""}`,
+    description: `${TYPE_LABEL[type]}${commune ? ` · ${commune}` : ""}${r.admin2 ? ` (${r.admin2})` : ""} · Source : GeoNames`,
+    commune,
   };
 }
 

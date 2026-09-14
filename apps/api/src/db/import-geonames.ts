@@ -17,7 +17,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./client";
 import { ensureDatabase } from "./migrate";
 import { areas } from "./schema";
-import { extractFromZip, parseGeoNamesLine, toImportedArea, type ImportedArea } from "../services/geonames";
+import { collectCommuneNames, extractFromZip, parseGeoNamesLine, toImportedArea, type GeoNamesRecord, type ImportedArea } from "../services/geonames";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(here, "..", "..", "data", "geonames");
@@ -79,12 +79,18 @@ export async function importGeoNames(opts: Options): Promise<Record<string, numb
   const text = readText(file);
   const lines = text.split("\n");
   const filter = { departements: opts.departements };
-  const batch: ImportedArea[] = [];
-  const counts: Record<string, number> = {};
+  // Première passe : noms des communes (entrées ADM4) pour rattacher chaque lieu à sa commune.
+  const records: GeoNamesRecord[] = [];
   for (const line of lines) {
     const rec = parseGeoNamesLine(line);
-    if (!rec) continue;
-    const area = toImportedArea(rec, filter);
+    if (rec) records.push(rec);
+  }
+  const communeNames = collectCommuneNames(records);
+  console.log(`[geo] ${records.length} entrées lues, ${communeNames.size} communes identifiées.`);
+  const batch: ImportedArea[] = [];
+  const counts: Record<string, number> = {};
+  for (const rec of records) {
+    const area = toImportedArea(rec, filter, communeNames);
     if (!area) continue;
     batch.push(area);
     counts[area.type] = (counts[area.type] ?? 0) + 1;
@@ -96,8 +102,8 @@ export async function importGeoNames(opts: Options): Promise<Record<string, numb
     db.transaction((tx) => {
       for (const a of slice) {
         tx.insert(areas)
-          .values({ id: a.id, name: a.name, nameNormalized: a.nameNormalized, type: a.type, lat: a.lat, lng: a.lng, bbox: null, elevation: a.elevation, description: a.description })
-          .onConflictDoUpdate({ target: areas.id, set: { name: a.name, nameNormalized: a.nameNormalized, type: a.type, lat: a.lat, lng: a.lng, elevation: a.elevation, description: a.description } })
+          .values({ id: a.id, name: a.name, nameNormalized: a.nameNormalized, type: a.type, lat: a.lat, lng: a.lng, bbox: null, elevation: a.elevation, description: a.description, commune: a.commune })
+          .onConflictDoUpdate({ target: areas.id, set: { name: a.name, nameNormalized: a.nameNormalized, type: a.type, lat: a.lat, lng: a.lng, elevation: a.elevation, description: a.description, commune: a.commune } })
           .run();
       }
     });
