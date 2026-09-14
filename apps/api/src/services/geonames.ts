@@ -161,48 +161,51 @@ export function toImportedArea(r: GeoNamesRecord, filter: ImportFilter, communeN
 }
 
 /**
- * Extrait un fichier d'une archive zip simple (entrées « stored » ou « deflate »), sans dépendance.
- * Suffisant pour les exports GeoNames (FR.zip contient FR.txt et readme.txt).
+ * Extrait un fichier d'une archive zip (entrées « stored » ou « deflate »), sans dépendance,
+ * en s'appuyant sur le répertoire central (les exports GeoNames utilisent des descripteurs de
+ * données : les tailles ne figurent pas dans les en-têtes locaux). Archives < 4 Go (pas de ZIP64).
  */
 export function extractFromZip(zip: Buffer, fileName: string): Buffer {
-  let offset = 0;
-  while (offset + 30 <= zip.length) {
-    const signature = zip.readUInt32LE(offset);
-    if (signature !== 0x04034b50) break; // fin des entrées locales
-    const method = zip.readUInt16LE(offset + 8);
-    const flags = zip.readUInt16LE(offset + 6);
-    let compressedSize = zip.readUInt32LE(offset + 18);
-    const nameLength = zip.readUInt16LE(offset + 26);
-    const extraLength = zip.readUInt16LE(offset + 28);
-    const name = zip.subarray(offset + 30, offset + 30 + nameLength).toString("utf8");
-    const dataStart = offset + 30 + nameLength + extraLength;
-    if ((flags & 0x08) !== 0 || compressedSize === 0xffffffff) {
-      // Taille inconnue dans l'en-tête local : on la lit dans le répertoire central.
-      compressedSize = sizeFromCentralDirectory(zip, name) ?? compressedSize;
-    }
-    const data = zip.subarray(dataStart, dataStart + compressedSize);
-    if (name === fileName || name.endsWith(`/${fileName}`)) {
-      if (method === 0) return Buffer.from(data);
-      if (method === 8) return inflateRawSync(data);
-      throw new Error(`Méthode de compression zip non prise en charge : ${method}`);
-    }
-    offset = dataStart + compressedSize;
-  }
-  throw new Error(`Fichier ${fileName} introuvable dans l'archive`);
+  const entry = listZipEntries(zip).find((e) => e.name === fileName || e.name.endsWith(`/${fileName}`));
+  if (!entry) throw new Error(`Fichier ${fileName} introuvable dans l'archive (entrées : ${listZipEntries(zip).map((e) => e.name).join(", ") || "aucune"})`);
+  const local = entry.localHeaderOffset;
+  if (local + 30 > zip.length || zip.readUInt32LE(local) !== 0x04034b50) throw new Error("Archive zip invalide (en-tête local absent)");
+  const nameLength = zip.readUInt16LE(local + 26);
+  const extraLength = zip.readUInt16LE(local + 28);
+  const dataStart = local + 30 + nameLength + extraLength;
+  const data = zip.subarray(dataStart, dataStart + entry.compressedSize);
+  if (entry.method === 0) return Buffer.from(data);
+  if (entry.method === 8) return inflateRawSync(data);
+  throw new Error(`Méthode de compression zip non prise en charge : ${entry.method}`);
 }
 
-function sizeFromCentralDirectory(zip: Buffer, fileName: string): number | null {
+export interface ZipEntry {
+  name: string;
+  method: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  localHeaderOffset: number;
+}
+
+/** Entrées du répertoire central d'une archive zip. */
+export function listZipEntries(zip: Buffer): ZipEntry[] {
   const eocd = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  if (eocd < 0) return null;
+  if (eocd < 0) return [];
+  const total = zip.readUInt16LE(eocd + 10);
   let p = zip.readUInt32LE(eocd + 16);
-  while (p + 46 <= zip.length && zip.readUInt32LE(p) === 0x02014b50) {
-    const compressedSize = zip.readUInt32LE(p + 20);
-    const n = zip.readUInt16LE(p + 28);
-    const e = zip.readUInt16LE(p + 30);
-    const k = zip.readUInt16LE(p + 32);
-    const name = zip.subarray(p + 46, p + 46 + n).toString("utf8");
-    if (name === fileName) return compressedSize;
-    p += 46 + n + e + k;
+  const entries: ZipEntry[] = [];
+  while (entries.length < total && p + 46 <= zip.length && zip.readUInt32LE(p) === 0x02014b50) {
+    const nameLength = zip.readUInt16LE(p + 28);
+    const extraLength = zip.readUInt16LE(p + 30);
+    const commentLength = zip.readUInt16LE(p + 32);
+    entries.push({
+      name: zip.subarray(p + 46, p + 46 + nameLength).toString("utf8"),
+      method: zip.readUInt16LE(p + 10),
+      compressedSize: zip.readUInt32LE(p + 20),
+      uncompressedSize: zip.readUInt32LE(p + 24),
+      localHeaderOffset: zip.readUInt32LE(p + 42),
+    });
+    p += 46 + nameLength + extraLength + commentLength;
   }
-  return null;
+  return entries;
 }
