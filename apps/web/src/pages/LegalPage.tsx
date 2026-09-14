@@ -57,6 +57,7 @@ export default function LegalPage() {
               <li>Fond topographique © OpenTopoMap (CC-BY-SA), données SRTM.</li>
               <li>Imagerie satellite : Esri World Imagery (Esri, Maxar, Earthstar Geographics et la communauté des utilisateurs SIG).</li>
               <li>Relief : AWS Terrain Tiles (Mapzen / Amazon).</li>
+              <li>Référentiel des lieux-dits et toponymes : GeoNames (CC BY 4.0) et géocodage IGN Géoplateforme (Licence Ouverte Etalab).</li>
             </ul>
           </section>
 

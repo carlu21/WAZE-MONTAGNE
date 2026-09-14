@@ -9,6 +9,7 @@ import { Compass, History, Mountain, Navigation } from "lucide-react";
 import { fr, type Area } from "@mountain-live/core";
 import { CategoryIcon, EmptyState, ListItem, SearchField, SkeletonListItem, TopBar } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useUiStore } from "@/store/ui";
 import { qk } from "@/lib/queryKeys";
 import { formatElevation } from "@/lib/format";
 import { AREA_TYPE_ICONS, areaSubtitle } from "@/features/map/areas";
@@ -31,7 +32,7 @@ export default function ExplorePage() {
 
   const search = useQuery({
     queryKey: qk.areaSearch(debounced),
-    queryFn: () => api.areas.search(debounced),
+    queryFn: () => api.areas.search(debounced, useUiStore.getState().position),
     enabled: debounced.length >= 2,
     staleTime: 5 * 60_000,
   });
@@ -71,7 +72,7 @@ export default function ExplorePage() {
                 <SkeletonListItem />
               </div>
             ) : groups.length === 0 ? (
-              <EmptyState compact icon={<Compass />} title={fr.explorePage.noResults} description="Essayez un autre nom : commune, massif, sommet, col, refuge, lac ou sentier." />
+              <EmptyState compact icon={<Compass />} title={fr.explorePage.noResults} description="Essayez un autre nom : lieu-dit, hameau, commune, sommet, col, refuge, lac ou sentier. Les lieux absents de la base sont recherchés en ligne (IGN) quand le réseau est disponible." />
             ) : (
               groups.map((g) => (
                 <section key={g.type}>

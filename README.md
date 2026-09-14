@@ -35,6 +35,22 @@ Ouvrez http://localhost:5173 (idéalement en mode « appareil mobile » des outi
 
 Le jeu de données comprend une soixantaine de signalements visibles autour du GR20, de la Restonica, de Bavella, du Cinto…, 4 alertes officielles, 43 lieux, 8 sentiers, 32 points d'eau, des notifications et deux litiges ouverts.
 
+## Référentiel des lieux (lieux-dits, sommets, cols, sources…)
+
+La recherche (barre de la carte, page Explorer) combine trois sources :
+
+1. le jeu de démonstration (44 lieux corses) ;
+2. le **référentiel GeoNames** importé dans la base : lieux-dits, hameaux, communes, sommets, cols, refuges, lacs, sources, sentiers (licence CC BY 4.0). Import de la Corse en une commande, ou par double-clic sur `Importer les lieux-dits (GeoNames).command` :
+
+   ```bash
+   pnpm --filter @mountain-live/api geo:import                         # Corse (2A, 2B)
+   pnpm --filter @mountain-live/api geo:import -- --departements 04,05  # autres départements
+   pnpm --filter @mountain-live/api geo:import -- --all                 # toute la France (~400 000 lieux)
+   pnpm --filter @mountain-live/api geo:import -- --file ~/FR.zip       # archive déjà téléchargée
+   ```
+
+3. le **géocodeur en ligne de l'IGN** (Géoplateforme, index « poi » et communes) en repli quand la base répond peu : tout lieu-dit de France devient trouvable dès qu'il y a du réseau, et les résultats sont mémorisés en base (identifiants `g_…`) pour les fiches et les recherches suivantes. Désactivable avec `GEOCODER_DISABLED=1`, service remplaçable avec `GEOCODER_URL`.
+
 ## Ce que fait le MVP
 
 | Section du cahier des charges | Réalisé |
@@ -77,7 +93,7 @@ docs/           Cahier des charges, architecture, navigation, modèle de donnée
 | `pnpm --filter @mountain-live/api db:reset` | recrée la base et le jeu de données |
 | `pnpm --filter @mountain-live/web preview` | sert le build de production |
 
-Variables d'environnement de l'API (voir `apps/api/.env.example`) : `PORT`, `JWT_SECRET` (obligatoire en production), `DATABASE_PATH`, `UPLOAD_DIR`, `CORS_ORIGINS`, `TRUST_PROXY`.
+Variables d'environnement de l'API (voir `apps/api/.env.example`) : `PORT`, `JWT_SECRET` (obligatoire en production), `DATABASE_PATH`, `UPLOAD_DIR`, `CORS_ORIGINS`, `TRUST_PROXY`, `GEOCODER_URL`, `GEOCODER_DISABLED`.
 
 ## Documentation
 

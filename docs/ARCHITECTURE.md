@@ -135,6 +135,10 @@ sequenceDiagram
 
 `useReports(bbox, zoom)` interroge `GET /reports?bbox&categories&source&lat&lng` sur une emprise élargie de 30 % alignée sur une grille (clé de cache stable), rafraîchit toutes les 60 s, écrit les résultats dans Dexie et s'y replie hors ligne. La couche `ReportsLayer` construit une source GeoJSON clusterisée (rayon 48 px, jusqu'au zoom 13), filtre par priorité (zoom < 10 : priorité 3 seulement ; < 12 : priorité ≥ 2) et applique l'opacité `fade`.
 
+### Recherche de lieux
+
+`GET /areas/search` interroge la table `areas` (recherche insensible aux accents sur le nom et les noms alternatifs), qui contient le jeu de démonstration et, après `geo:import`, le référentiel GeoNames du territoire (lieux-dits, hameaux, communes, sommets, cols, refuges, lacs, sources, sentiers). Quand la base répond peu, `services/geocoder.ts` interroge en parallèle les index « poi » et « address » (communes) du géocodeur IGN Géoplateforme avec un délai de 4 s, fusionne les résultats sans doublon (`mergeAreaResults`) et mémorise les lieux trouvés dans `areas` avec un identifiant stable dérivé du nom et de la position, pour que `/areas/:id` et les recherches suivantes fonctionnent, y compris hors ligne côté serveur.
+
 ### Alertes de proximité et présence
 
 `AlertsWatcher` (monté une fois) : à chaque déplacement de plus de 50 m ou toutes les 20 s, `computeAlerts` compare la position aux signalements connus (caches TanStack + Dexie) dans le rayon et les catégories des préférences ; regroupe troupeau + chiens de protection ; les alertes officielles priment ; chaque alerte n'est émise qu'une fois par 6 h ; toast persistant avec « Voir », vibration, notification système si l'onglet est masqué. Toutes les 5 minutes au plus, `POST /presence` envoie la position : le serveur ne stocke que la **cellule ≈1 km** et une tranche de 5 minutes, sans identifiant, purgée après 30 minutes ; `GET /presence?bbox` alimente la carte thermique et « Environ N utilisateurs actifs ».

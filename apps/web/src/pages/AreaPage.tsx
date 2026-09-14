@@ -78,7 +78,7 @@ export default function AreaPage() {
   const excluded = new Set([...restrictions, ...activities].map((r) => r.id));
   const others = data.reports.filter((r) => !excluded.has(r.id));
   const bbox = area.bbox ?? null;
-  const zoom = area.type === "massif" ? 11 : area.type === "commune" ? 12 : 13;
+  const zoom = area.type === "massif" ? 11 : area.type === "commune" ? 12 : area.type === "hamlet" || area.type === "spring" ? 14 : 13;
 
   const openMap = () => {
     setView({ lat: area.lat, lng: area.lng, zoom });

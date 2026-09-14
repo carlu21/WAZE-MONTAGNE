@@ -13,6 +13,8 @@ export const AREA_TYPE_LABELS: Record<AreaType, string> = {
   place: "Lieu",
   refuge: "Refuge",
   lake: "Lac",
+  hamlet: "Lieu-dit",
+  spring: "Source",
 };
 
 /** Icônes lucide (kebab-case) par type de lieu. */
@@ -25,6 +27,8 @@ export const AREA_TYPE_ICONS: Record<AreaType, string> = {
   place: "map-pin",
   refuge: "house",
   lake: "waves",
+  hamlet: "map-pin-house",
+  spring: "droplet",
 };
 
 /** Zoom de cadrage quand le lieu n'a pas d'emprise (bbox). */
@@ -37,6 +41,8 @@ export const AREA_TYPE_ZOOM: Record<AreaType, number> = {
   place: 13.5,
   refuge: 14,
   lake: 13.5,
+  hamlet: 14,
+  spring: 14.5,
 };
 
 export function areaTypeLabel(type: AreaType | string): string {

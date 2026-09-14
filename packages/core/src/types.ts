@@ -142,7 +142,11 @@ export type AreaType =
   | "pass"
   | "place"
   | "refuge"
-  | "lake";
+  | "lake"
+  /** Lieu-dit, hameau, écart (référentiels toponymiques). */
+  | "hamlet"
+  /** Source, fontaine, résurgence. */
+  | "spring";
 
 export type Basemap = "topo" | "satellite" | "classic" | "relief";
 

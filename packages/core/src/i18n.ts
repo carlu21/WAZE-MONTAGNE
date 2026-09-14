@@ -381,7 +381,7 @@ export const fr = {
 
   /** Carte principale (sections 3 et 10). */
   mapUi: {
-    search: "Rechercher une montagne, une commune, un col, un sentier…",
+    search: "Rechercher un lieu-dit, une commune, un col…",
     centerOnMe: "Me localiser",
     filters: "Filtres",
     basemap: "Fond de carte",
@@ -412,7 +412,7 @@ export const fr = {
   /** Page Explorer (section 22). */
   explorePage: {
     title: "Explorer",
-    searchPlaceholder: "Commune, massif, sentier, sommet, lieu…",
+    searchPlaceholder: "Lieu-dit, commune, sommet, col, sentier…",
     recent: "Signalements récents",
     water: "Points d'eau",
     activities: "Activités en cours",

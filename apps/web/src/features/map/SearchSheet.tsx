@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Clock3, Search } from "lucide-react";
 import { fr, type Area } from "@mountain-live/core";
+import { useUiStore } from "@/store/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { formatElevation } from "@/lib/format";
@@ -49,7 +50,7 @@ export function SearchSheet({ open, onClose, onSelect }: SearchSheetProps) {
 
   const { data, isFetching, isError, refetch } = useQuery({
     queryKey: qk.areaSearch(debounced),
-    queryFn: () => api.areas.search(debounced),
+    queryFn: () => api.areas.search(debounced, useUiStore.getState().position),
     enabled: open && active,
     staleTime: 5 * 60_000,
     retry: 1,

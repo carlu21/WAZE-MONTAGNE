@@ -58,6 +58,16 @@ export const config = {
   zoneMaxDistanceM: 8000,
   /** Rayon de notification de proximité (mètres). */
   proximityNotifyRadiusM: 2000,
+  /**
+   * Géocodeur en ligne (repli quand un lieu n'est pas dans la base) : API de géocodage de la
+   * Géoplateforme IGN (index « poi » : lieux-dits, sommets, cols, sources… et « address » :
+   * communes). GEOCODER_DISABLED=1 le désactive ; GEOCODER_URL permet un autre service compatible.
+   */
+  geocoder: {
+    enabled: process.env.GEOCODER_DISABLED !== "1" && env !== "test",
+    url: process.env.GEOCODER_URL ?? "https://data.geopf.fr/geocodage/search",
+    timeoutMs: intEnv("GEOCODER_TIMEOUT_MS", 4000),
+  },
   /** Limites de débit en mémoire (par adresse IP). RATE_LIMIT_DISABLED=1 les désactive (tests). */
   rateLimit: {
     enabled: process.env.RATE_LIMIT_DISABLED !== "1" && env !== "test",

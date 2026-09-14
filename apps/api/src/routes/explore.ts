@@ -15,7 +15,7 @@ import { db } from "../db/client";
 import { areas } from "../db/schema";
 import { optionalAuth, type AppEnv } from "../middleware/auth";
 import { readQuery } from "../middleware/validate";
-import { areaBBox, searchAreas } from "../services/areas";
+import { areaBBox, searchAreasWithFallback } from "../services/areas";
 import { HttpError } from "../services/errors";
 import { presenceEstimateInBBox } from "../services/presence";
 import { listOfficialAlerts, listTrailsInBBox, listWaterPointsInBBox, waterPointsAround } from "../services/reference";
@@ -48,9 +48,10 @@ exploreRoutes.get("/around", optionalAuth, (c) => {
   return c.json(body);
 });
 
-exploreRoutes.get("/areas/search", (c) => {
-  const q = readQuery(c, z.object({ q: z.string().max(80).default("") }));
-  const body: SearchAreasResponse = { areas: searchAreas(q.q).map(toArea) };
+exploreRoutes.get("/areas/search", async (c) => {
+  const q = readQuery(c, z.object({ q: z.string().max(80).default(""), lat: z.coerce.number().min(-90).max(90).optional(), lng: z.coerce.number().min(-180).max(180).optional() }));
+  const rows = await searchAreasWithFallback(q.q, { lat: q.lat, lng: q.lng });
+  const body: SearchAreasResponse = { areas: rows.map(toArea) };
   return c.json(body);
 });
 

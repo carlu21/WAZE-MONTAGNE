@@ -1,6 +1,6 @@
 import type { Area, AreaType } from "@mountain-live/core";
 
-export const AREA_TYPE_ORDER: readonly AreaType[] = ["commune", "massif", "trail", "summit", "pass", "refuge", "lake", "place"];
+export const AREA_TYPE_ORDER: readonly AreaType[] = ["commune", "hamlet", "massif", "trail", "summit", "pass", "refuge", "lake", "spring", "place"];
 export const AREA_TYPE_PLURAL: Record<AreaType, string> = {
   commune: "Communes",
   massif: "Massifs",
@@ -10,6 +10,8 @@ export const AREA_TYPE_PLURAL: Record<AreaType, string> = {
   refuge: "Refuges",
   lake: "Lacs",
   place: "Lieux",
+  hamlet: "Lieux-dits et hameaux",
+  spring: "Sources",
 };
 
 /** Regroupe des résultats de recherche par type, dans l'ordre d'affichage. */

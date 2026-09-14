@@ -158,7 +158,8 @@ export const api = {
       `/around${q({ lat: p.lat, lng: p.lng, radius: p.radius, categories: p.categories?.length ? p.categories.join(",") : undefined })}`,
     ),
   areas: {
-    search: (query: string) => request<SearchAreasResponse>("GET", `/areas/search${q({ q: query })}`),
+    search: (query: string, pos?: { lat: number; lng: number } | null) =>
+      request<SearchAreasResponse>("GET", `/areas/search${q({ q: query, lat: pos?.lat, lng: pos?.lng })}`),
     get: (id: string) => request<AreaSummary>("GET", `/areas/${id}`),
   },
   trails: (bbox: BBox) => request<{ trails: Trail[] }>("GET", `/trails${q({ bbox: bboxParam(bbox) })}`),
