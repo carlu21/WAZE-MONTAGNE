@@ -17,9 +17,24 @@ function intEnv(name: string, fallback: number): number {
  * Configuration de l'API. Tout est surchargeable par variable d'environnement
  * (voir .env.example et README.md). Les valeurs sont lues une seule fois au démarrage.
  */
+const DEV_JWT_SECRET = "dev-secret-change-me";
+function resolveJwtSecret(): string {
+  const raw = process.env.JWT_SECRET;
+  if (env === "production") {
+    // Jamais de secret par défaut en production : refus de démarrer (jetons admin forgeables sinon).
+    if (!raw || raw === DEV_JWT_SECRET || raw.length < 32) {
+      throw new Error("JWT_SECRET doit être défini en production (32 caractères minimum, différent de la valeur de développement).");
+    }
+    return raw;
+  }
+  return raw && raw.length > 0 ? raw : DEV_JWT_SECRET;
+}
+
 export const config = {
   port: intEnv("PORT", 8787),
-  jwtSecret: process.env.JWT_SECRET ?? "dev-secret-change-me",
+  jwtSecret: resolveJwtSecret(),
+  /** Adresses des reverse-proxies de confiance (X-Forwarded-For honoré uniquement derrière eux). */
+  trustProxy: (process.env.TRUST_PROXY ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   /** Durée de validité des jetons (secondes) : 30 jours. */
   jwtTtlSec: 30 * 24 * 3600,
   /** Chemin SQLite ; ":memory:" pour une base volatile (tests). */

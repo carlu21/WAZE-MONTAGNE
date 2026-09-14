@@ -5,7 +5,7 @@ import { LogIn } from "lucide-react";
 import { fr, loginSchema } from "@mountain-live/core";
 import { Button, Field, Input, LinkButton, toast } from "@/components/ui";
 import { api } from "@/lib/api";
-import { useSessionStore } from "@/store/session";
+import { clearSessionCaches, useSessionStore } from "@/store/session";
 import { AuthLayout, DemoAccounts } from "@/features/account/AuthLayout";
 import { authErrorMessage } from "@/features/account/authErrors";
 
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const login = useMutation({
     mutationFn: () => api.auth.login({ email: email.trim().toLowerCase(), password }),
     onSuccess: ({ token, user }) => {
+      void clearSessionCaches();
       setSession(token, user);
       setOnboardingDone(true);
       toast.success(`Bienvenue, ${user.pseudo} !`);

@@ -75,6 +75,8 @@ docs/           Cahier des charges, architecture, navigation, modèle de donnée
 | `pnpm --filter @mountain-live/api db:reset` | recrée la base et le jeu de données |
 | `pnpm --filter @mountain-live/web preview` | sert le build de production |
 
+Variables d'environnement de l'API (voir `apps/api/.env.example`) : `PORT`, `JWT_SECRET` (obligatoire en production), `DATABASE_PATH`, `UPLOAD_DIR`, `CORS_ORIGINS`, `TRUST_PROXY`.
+
 ## Documentation
 
 - [Cahier des charges](docs/CAHIER_DES_CHARGES.md)

@@ -43,7 +43,7 @@ export const CategoryTile = forwardRef<HTMLButtonElement, CategoryTileProps>(fun
         <CategoryIcon name={def.icon} size={32} strokeWidth={2.25} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[18px] font-bold leading-tight">{def.label}</span>
+        <span className="block break-words text-[17px] font-bold leading-tight [hyphens:auto]" lang="fr">{def.label}</span>
         {!compact ? <span className="mt-1 block text-[14px] leading-snug text-muted">{def.description}</span> : null}
       </span>
       {showChevron ? <ChevronRight className="size-6 shrink-0 text-subtle" aria-hidden="true" /> : null}

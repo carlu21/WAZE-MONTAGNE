@@ -141,7 +141,7 @@
 
   /* Action principale « Signaler » et avertissements */
   --accent: #d9822b;
-  --accent-hover: #b9691c;
+  --accent-hover: #a65c14;
   --accent-fg: #ffffff;
   --accent-soft: #fbebd9;
 
@@ -153,12 +153,12 @@
 
   --success: #2f6b3a;
   --success-soft: #e4efe5;
-  --warning: #b9691c;
+  --warning: #a65c14;
   --warning-soft: #fbebd9;
   --info: #1d6fa5;
   --info-soft: #ddebf5;
   --water: #1d6fa5;
-  --gold: #c9a227;
+  --gold: #8f6e10;
   --gold-fg: #6f5310;
   --gold-soft: #f6edcc;
   --ring: #2f6b3a;

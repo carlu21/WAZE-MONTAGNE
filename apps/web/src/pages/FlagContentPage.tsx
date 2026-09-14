@@ -84,7 +84,7 @@ export default function FlagContentPage() {
               </p>
             ) : null}
           </fieldset>
-          <Field label={fr.moderation.detailsLabel} optional>
+          <Field label={fr.moderation.detailsLabel}>
             <Textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={600} placeholder="Décrivez le problème…" />
           </Field>
           <p className="text-[13px] text-muted">Votre signalement est transmis à l'équipe de modération. Les abus répétés peuvent entraîner une suspension.</p>

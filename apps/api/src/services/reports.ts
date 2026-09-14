@@ -498,8 +498,11 @@ function extendedExpiry(row: ReportRow, now: Date): string {
   const extensionMin = def.recurring ? def.defaultTtlMin : Math.max(60, Math.round(def.defaultTtlMin / 2));
   let candidate = now.getTime() + extensionMin * 60_000;
   if (row.endsAt) candidate = Math.min(candidate, Date.parse(row.endsAt));
-  const maxAllowed = created + def.maxTtlMin * 60_000;
-  const next = Math.min(Math.max(Date.parse(row.expiresAt), candidate), maxAllowed);
+  // Plafond : durée maximale du sous-type, ou l'heure de fin déclarée si elle va au-delà (chasse, fermeture…).
+  let maxAllowed = created + def.maxTtlMin * 60_000;
+  if (row.endsAt && def.askEndTime) maxAllowed = Math.max(maxAllowed, Date.parse(row.endsAt));
+  // Une reconfirmation ne raccourcit jamais la visibilité.
+  const next = Math.max(Date.parse(row.expiresAt), Math.min(candidate, maxAllowed));
   return new Date(next).toISOString();
 }
 

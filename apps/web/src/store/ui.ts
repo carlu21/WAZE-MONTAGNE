@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Basemap, ReportCategory } from "@mountain-live/core";
+import type { Basemap, ReportCategory, ReportSubtype } from "@mountain-live/core";
 
 export interface MapViewState {
   lng: number;
@@ -14,6 +14,10 @@ export const DEFAULT_VIEW: MapViewState = { lng: 9.05, lat: 42.25, zoom: 8.6 };
 interface UiState {
   /** Catégories actives. Tableau vide = tout afficher. */
   filters: ReportCategory[];
+  /** Sous-types masqués à l'intérieur d'une catégorie affichée (ex. « Chasse » sans « Activités »). */
+  excludedSubtypes: ReportSubtype[];
+  /** La carte s'est déjà centrée sur la position pendant cette session. */
+  autoCentered: boolean;
   showOfficialOnly: boolean;
   basemap: Basemap;
   theme: "light" | "dark" | "system";
@@ -23,6 +27,8 @@ interface UiState {
   online: boolean;
   lastSyncAt: number | null;
   setFilters: (f: ReportCategory[]) => void;
+  setExcludedSubtypes: (s: ReportSubtype[]) => void;
+  setAutoCentered: (v: boolean) => void;
   toggleFilter: (c: ReportCategory) => void;
   setShowOfficialOnly: (v: boolean) => void;
   setBasemap: (b: Basemap) => void;
@@ -37,6 +43,8 @@ export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       filters: [],
+      excludedSubtypes: [],
+      autoCentered: false,
       showOfficialOnly: false,
       basemap: "topo",
       theme: "system",
@@ -45,6 +53,8 @@ export const useUiStore = create<UiState>()(
       online: typeof navigator === "undefined" ? true : navigator.onLine,
       lastSyncAt: null,
       setFilters: (filters) => set({ filters }),
+      setExcludedSubtypes: (excludedSubtypes) => set({ excludedSubtypes }),
+      setAutoCentered: (autoCentered) => set({ autoCentered }),
       toggleFilter: (c) => {
         const f = get().filters;
         set({ filters: f.includes(c) ? f.filter((x) => x !== c) : [...f, c] });
@@ -61,6 +71,7 @@ export const useUiStore = create<UiState>()(
       name: "ml.ui",
       partialize: (s) => ({
         filters: s.filters,
+        excludedSubtypes: s.excludedSubtypes,
         showOfficialOnly: s.showOfficialOnly,
         basemap: s.basemap,
         theme: s.theme,

@@ -37,7 +37,7 @@ export default defineConfig({
           {
             // Tuiles cartographiques : cache-first, longue durée (mode hors connexion basique)
             urlPattern: ({ url }) =>
-              /tile\.opentopomap\.org|tile\.openstreetmap\.org|server\.arcgisonline\.com|s3\.amazonaws\.com\/elevation-tiles-prod/.test(
+              /tile\.opentopomap\.org|demotiles\.maplibre\.org|tile\.openstreetmap\.org|server\.arcgisonline\.com|s3\.amazonaws\.com\/elevation-tiles-prod/.test(
                 url.host + url.pathname,
               ),
             handler: "CacheFirst",
@@ -59,7 +59,9 @@ export default defineConfig({
           },
           {
             // API : network-first avec repli cache
-            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            // Données publiques uniquement : jamais de réponse personnelle (session, notifications, admin…) ni de sonde /health.
+            urlPattern: ({ url, request }) =>
+              request.method === "GET" && url.pathname.startsWith("/api/") && !/^\/api\/v1\/(auth|users|notifications|admin|pro|health|flags)(\/|$)/.test(url.pathname),
             handler: "NetworkFirst",
             options: {
               cacheName: "api",

@@ -9,10 +9,10 @@
  * - Recentrage après une publication (state.focus) ou après une recherche de lieu.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
-import { Info } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router";
+import { Info, List } from "lucide-react";
 import type { Map as MaplibreMap } from "maplibre-gl";
-import { fr, inBBox, type Area, type BBox, type OfficialAlert, type Report } from "@mountain-live/core";
+import { fr, inBBox, phrases, type Area, type BBox, type OfficialAlert, type Report } from "@mountain-live/core";
 import { IconButton } from "@/components/ui";
 import { MapView, isMapAlive } from "@/components/map/MapView";
 import { useUiStore, type MapViewState } from "@/store/ui";
@@ -50,6 +50,7 @@ export default function MapPage() {
   const filters = useUiStore((s) => s.filters);
   const showOfficialOnly = useUiStore((s) => s.showOfficialOnly);
   const position = useUiStore((s) => s.position);
+  const setAutoCentered = useUiStore((s) => s.setAutoCentered);
 
   const mapRef = useRef<MaplibreMap | null>(null);
   const [viewBBox, setViewBBox] = useState<BBox | null>(null);
@@ -63,7 +64,9 @@ export default function MapPage() {
   const firstLocateDone = useRef(false);
 
   const geolocation = useGeolocation();
-  const { reports, officialAlerts, isLoading, isFetching } = useReports(viewBBox, zoom);
+  const { data, reports, officialAlerts, isLoading, isFetching } = useReports(viewBBox, zoom);
+  // « Chargement… » tant qu'aucune donnée n'est arrivée (y compris avant la première emprise connue).
+  const loadingFirst = isLoading || data === undefined;
 
   // Signalements réellement visibles dans la vue courante (zoom intelligent + emprise).
   const visibleReports = useMemo(() => {
@@ -118,16 +121,22 @@ export default function MapPage() {
       mapRef.current = map;
       // Recentrage demandé par l'assistant de signalement (publication ou mise en attente).
       if (navState?.focus) {
-        moveCamera(map, navState.focus, FOCUS_ZOOM, false);
+        moveCamera(map, navState.focus, navState.zoom ?? FOCUS_ZOOM, false);
         firstLocateDone.current = true;
+        setAutoCentered(true);
         // L'état de navigation ne doit pas être rejoué à la prochaine visite.
         navigate(location.pathname, { replace: true, state: null });
         return;
       }
-      // Premier chargement avec une position connue : la carte se centre sur l'utilisateur (section 33).
-      if (!firstLocateDone.current && position && Date.now() - position.at < 10 * 60_000) {
+      // Premier chargement de la session avec une position connue : la carte se centre sur
+      // l'utilisateur (section 33). Une seule fois par session : revenir sur l'onglet Carte ou
+      // arriver depuis « Ouvrir la carte ici » conserve la vue demandée.
+      if (!useUiStore.getState().autoCentered && position && Date.now() - position.at < 10 * 60_000) {
         firstLocateDone.current = true;
+        setAutoCentered(true);
         moveCamera(map, position, FIRST_LOCATE_ZOOM, false);
+      } else if (useUiStore.getState().autoCentered) {
+        firstLocateDone.current = true;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,10 +146,12 @@ export default function MapPage() {
   // Position obtenue après le chargement de la carte : centrage unique.
   useEffect(() => {
     if (firstLocateDone.current || !position || !mapRef.current) return;
+    if (useUiStore.getState().autoCentered) return;
     if (Date.now() - position.at > 60_000) return;
     firstLocateDone.current = true;
+    setAutoCentered(true);
     flyTo(position, FIRST_LOCATE_ZOOM);
-  }, [position, flyTo]);
+  }, [position, flyTo, setAutoCentered]);
 
   const onMoveEnd = useCallback(
     (bbox: BBox, view: MapViewState) => {
@@ -176,7 +187,7 @@ export default function MapPage() {
   );
 
   const filterCount = countActiveFilters(filters, showOfficialOnly);
-  const showEmpty = !isLoading && viewBBox !== null && visibleReports.length === 0 && officialAlerts.length === 0;
+  const showEmpty = !loadingFirst && viewBBox !== null && visibleReports.length === 0 && officialAlerts.length === 0;
 
   return (
     <div className="relative h-full min-h-0 w-full overflow-hidden" data-testid="map-page">
@@ -186,32 +197,38 @@ export default function MapPage() {
         <ReportsLayer reports={reports} zoom={zoom} selectedId={selectedReportId} onSelect={selectReport} />
         <UserLocation />
         <SearchMarker area={searchArea} onClick={(a) => navigate(`/explore/${a.id}`)} />
+        {/* Dans le contexte de la carte : le bouton « Me localiser » peut la recentrer. */}
+        <MapTopBar
+          onSearch={() => setSheet("search")}
+          searchValue={searchArea?.name}
+          onFilters={() => setSheet("filters")}
+          filterCount={filterCount}
+          geolocation={geolocation}
+        />
       </MapView>
-
-      <MapTopBar
-        onSearch={() => setSheet("search")}
-        searchValue={searchArea?.name}
-        onFilters={() => setSheet("filters")}
-        filterCount={filterCount}
-        geolocation={geolocation}
-      />
 
       {/* Indicateurs discrets : compteur, présence, chargement */}
       <div className="pointer-events-none absolute left-3 right-3 z-[var(--z-overlay)] flex flex-col items-start gap-2" style={{ top: "calc(var(--safe-top) + var(--topbar-height) + 12px)" }}>
-        <div className="glass pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold text-fg" aria-live="polite">
+        <Link
+          to="/around"
+          className="glass pointer-events-auto inline-flex min-h-11 max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-[14px] font-semibold text-fg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40"
+          aria-label={`${fr.nav.around} — ${visibleReports.length} ${visibleReports.length > 1 ? "signalements" : "signalement"} dans la vue`}
+          title={fr.nav.around}
+        >
           <span
             className={isFetching ? "size-2 animate-pulse rounded-full bg-accent" : "size-2 rounded-full bg-success"}
             aria-hidden="true"
           />
-          <span className="truncate">
-            {isLoading
+          <span className="truncate" aria-live="polite">
+            {loadingFirst
               ? fr.common.loading
               : `${visibleReports.length} ${visibleReports.length > 1 ? "signalements" : "signalement"} dans la vue`}
           </span>
-        </div>
+          <List className="size-4 shrink-0 text-primary" aria-hidden="true" />
+        </Link>
         {activeUsers > 0 ? (
-          <div className="glass pointer-events-auto inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[13px] text-fg">
-            {fr.mapUi.presence.replace("{n}", String(activeUsers))}
+          <div className="glass pointer-events-auto inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[14px] text-fg">
+            {phrases.activeUsers(activeUsers)}
           </div>
         ) : null}
       </div>

@@ -204,6 +204,22 @@ export default function ReportDetailPage() {
             </div>
           </section>
 
+          {/* Votes : l'action principale reste visible sans défiler (section 31) */}
+          <ConfirmationBar
+            current={report.myConfirmation}
+            onVote={(kind) => void actions.voteOrQueue(kind)}
+            onDispute={() => (actions.requireLogin() ? setDisputeOpen(true) : undefined)}
+            pending={actions.vote.isPending}
+            isAuthor={isAuthor}
+            closed={closed}
+          />
+          {isAuthor && !closed ? (
+            <Button size="lg" variant="outline" leftIcon={<CircleCheck />} loading={actions.resolve.isPending} onClick={() => actions.resolve.mutate()}>
+              {fr.sheet.actions.resolve}
+            </Button>
+          ) : null}
+
+
           {/* Informations clés */}
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-surface p-4 shadow-sm sm:grid-cols-3">
             <Info label="Distance">{distanceM != null ? <Distance meters={distanceM} /> : "—"}</Info>
@@ -245,7 +261,7 @@ export default function ReportDetailPage() {
           {/* Confiance communautaire */}
           <section className="rounded-xl border border-line bg-surface p-4">
             <p className="text-[15px] font-semibold text-fg">{phrases.confirmedBy(report.confirmationsCount)}</p>
-            <p className="text-[13px] text-muted">
+            <p className="text-[14px] text-muted">
               {report.lastConfirmationAt ? phrases.lastConfirmation(report.lastConfirmationAt) : fr.sheet.noConfirmation}
               {report.disputesCount ? ` · contesté par ${report.disputesCount}` : ""}
               {report.resolvedVotesCount ? ` · « plus présent » selon ${report.resolvedVotesCount}` : ""}
@@ -262,23 +278,8 @@ export default function ReportDetailPage() {
             ) : null}
           </section>
 
-          {/* Votes */}
-          <ConfirmationBar
-            current={report.myConfirmation}
-            onVote={(kind) => void actions.voteOrQueue(kind)}
-            onDispute={() => (actions.requireLogin() ? setDisputeOpen(true) : undefined)}
-            pending={actions.vote.isPending}
-            isAuthor={isAuthor}
-            closed={closed}
-          />
-          {isAuthor && !closed ? (
-            <Button size="lg" variant="outline" leftIcon={<CircleCheck />} loading={actions.resolve.isPending} onClick={() => actions.resolve.mutate()}>
-              {fr.sheet.actions.resolve}
-            </Button>
-          ) : null}
-
           {/* Actions secondaires */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" aria-hidden="true" tabIndex={-1} onChange={(e) => void onPickPhoto(e.target.files?.[0])} />
             <Button size="md" variant="secondary" leftIcon={<Camera />} loading={uploading} disabled={closed} onClick={() => (actions.requireLogin() ? fileRef.current?.click() : undefined)}>
               {fr.sheet.actions.addPhoto}

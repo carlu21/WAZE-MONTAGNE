@@ -66,7 +66,7 @@ export function listOfficialAlerts(box: BBox | null, now = new Date()): Official
     .select()
     .from(officialAlerts)
     .where(and(...conds))
-    .orderBy(sql`${officialAlerts.severity} DESC`, sql`${officialAlerts.startsAt} DESC`)
+    .orderBy(sql`CASE ${officialAlerts.severity} WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'moderate' THEN 2 ELSE 3 END`, sql`${officialAlerts.startsAt} DESC`)
     .all();
 }
 

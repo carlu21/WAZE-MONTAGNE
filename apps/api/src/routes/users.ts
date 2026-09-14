@@ -2,18 +2,7 @@ import { Hono } from "hono";
 import { eq, sql } from "drizzle-orm";
 import { preferencesSchema, updateMeSchema, type UserPreferences } from "@mountain-live/core";
 import { db } from "../db/client";
-import {
-  notifications,
-  offlineZones,
-  partners,
-  photos,
-  reportComments,
-  reports,
-  userPreferences,
-  userReputationEvents,
-  users,
-  type UserRow,
-} from "../db/schema";
+import { notifications, offlineZones, partners, photos, reportComments, reports, userPreferences, userReputationEvents, users, type UserRow, reportConfirmations, moderationReports } from "../db/schema";
 import { requireAuth, type AppEnv } from "../middleware/auth";
 import { readJson } from "../middleware/validate";
 import { HttpError } from "../services/errors";
@@ -89,6 +78,10 @@ usersRoutes.delete("/me", requireAuth, (c) => {
     tx.delete(userPreferences).where(eq(userPreferences.userId, user.id)).run();
     tx.delete(notifications).where(eq(notifications.userId, user.id)).run();
     tx.delete(offlineZones).where(eq(offlineZones.userId, user.id)).run();
+    // Votes : le commentaire libre (données personnelles possibles) est effacé ; le vote reste compté.
+    tx.update(reportConfirmations).set({ comment: null }).where(eq(reportConfirmations.userId, user.id)).run();
+    // Signalements de contenu déposés : précisions effacées.
+    tx.update(moderationReports).set({ details: null }).where(eq(moderationReports.reporterId, user.id)).run();
   });
   forgetUserPresence(user.id);
   return c.body(null, 204);

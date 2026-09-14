@@ -19,6 +19,7 @@ import { api, ApiError } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 import { useSessionStore } from "@/store/session";
 import { BottomSheet, Button, Chip, Segmented, Toggle, toast } from "@/components/ui";
+import { isFacetExcluded, toggleFacet } from "@/features/map/facets";
 import { BASEMAPS, BASEMAP_ORDER } from "@/components/map/basemaps";
 
 export interface FilterSheetProps {
@@ -39,6 +40,8 @@ export function FilterSheet({ open, onClose }: FilterSheetProps) {
   const showOfficialOnly = useUiStore((s) => s.showOfficialOnly);
   const basemap = useUiStore((s) => s.basemap);
   const setFilters = useUiStore((s) => s.setFilters);
+  const excludedSubtypes = useUiStore((s) => s.excludedSubtypes);
+  const setExcludedSubtypes = useUiStore((s) => s.setExcludedSubtypes);
   const toggleFilter = useUiStore((s) => s.toggleFilter);
   const setShowOfficialOnly = useUiStore((s) => s.setShowOfficialOnly);
   const setBasemap = useUiStore((s) => s.setBasemap);
@@ -72,6 +75,7 @@ export function FilterSheet({ open, onClose }: FilterSheetProps) {
 
   const reset = () => {
     setFilters([]);
+    setExcludedSubtypes([]);
     setShowOfficialOnly(false);
   };
 
@@ -113,14 +117,36 @@ export function FilterSheet({ open, onClose }: FilterSheetProps) {
             Catégories
           </h3>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Catégories affichées">
-            <Chip selected={allSelected} icon="layers" onClick={() => setFilters([])}>
+            <Chip selected={allSelected && excludedSubtypes.length === 0} icon="layers" onClick={() => { setFilters([]); setExcludedSubtypes([]); }}>
               {fr.filters.all}
             </Chip>
-            {FILTER_CATEGORIES.map((c) => (
-              <Chip key={c} category={c} selected={filters.includes(c)} onClick={() => toggleFilter(c)}>
-                {CATEGORY_BY_ID[c].shortLabel}
-              </Chip>
-            ))}
+            {FILTER_CATEGORIES.map((c) =>
+              c === "activity" ? (
+                // Section 11 : « Chasse » et « Activités » sont deux filtres distincts.
+                (["hunting", "activities"] as const).map((facet) => {
+                  const on = (filters.length === 0 || filters.includes("activity")) && !isFacetExcluded(facet, excludedSubtypes);
+                  return (
+                    <Chip
+                      key={facet}
+                      category="activity"
+                      icon={facet === "hunting" ? "crosshair" : "hard-hat"}
+                      selected={on}
+                      onClick={() => {
+                        const next = toggleFacet(facet, filters, excludedSubtypes);
+                        setFilters(next.filters as ReportCategory[]);
+                        setExcludedSubtypes(next.excluded);
+                      }}
+                    >
+                      {facet === "hunting" ? fr.filters.hunting : fr.filters.activity}
+                    </Chip>
+                  );
+                })
+              ) : (
+                <Chip key={c} category={c} selected={filters.includes(c)} onClick={() => toggleFilter(c)}>
+                  {CATEGORY_BY_ID[c].shortLabel}
+                </Chip>
+              ),
+            )}
             {practiceFilters && practiceFilters.length > 0 ? (
               <Chip selected={practiceActive} icon={<Compass size={20} />} onClick={() => setFilters(practiceFilters)}>
                 {fr.filters.byPractice}

@@ -31,6 +31,11 @@ describe("moteur d'alertes de proximité", () => {
     expect(computeAlerts(me, [tree, crowd], [], DEFAULT_ALERT_PREFS, new Set(["report:t"]))).toHaveLength(0);
   });
 
+  it("traite une liste de catégories vide comme « toutes »", () => {
+    const tree = base("t", "fallen_tree", "danger", 42.3027, 9.15);
+    expect(computeAlerts(me, [tree], [], { enabled: true, radiusM: 500, categories: [] }, new Set())).toHaveLength(1);
+  });
+
   it("place les alertes officielles en premier", () => {
     const tree = base("t", "fallen_tree", "danger", 42.3027, 9.15);
     const official: OfficialAlert = { id: "o", organisation: "Préfecture", title: "Risque incendie", body: "", category: "danger", severity: "high", geometry: { type: "Point", coordinates: [9.15, 42.31] }, centroidLat: 42.31, centroidLng: 9.15, startsAt: "", endsAt: null, url: null, createdAt: "" };

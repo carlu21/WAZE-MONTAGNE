@@ -48,7 +48,7 @@ function errMsg(e: unknown): string {
 export default function AdminPage() {
   const navigate = useNavigate();
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg" style={{ paddingTop: "var(--safe-top)" }}>
+    <div className="flex h-full min-h-0 flex-col bg-bg">
       <TopBar
         variant="solid"
         title={fr.moderation.admin.title}
@@ -457,11 +457,13 @@ function UsersTab() {
 
 /* ------------------------------------------------------------------ */
 const CORSICA_BBOX = { west: 8.5, south: 41.3, east: 9.6, north: 43.1 };
+/** Valeur locale pour un champ datetime-local (l'ISO UTC décalerait l'heure affichée). */
+const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 function AlertsTab() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ organisation: "", title: "", body: "", category: "danger" as ReportCategory, severity: "high" as DangerLevel, startsAt: new Date().toISOString().slice(0, 16), endsAt: "", url: "" });
+  const [form, setForm] = useState({ organisation: "", title: "", body: "", category: "danger" as ReportCategory, severity: "high" as DangerLevel, startsAt: toLocalInput(new Date()), endsAt: "", url: "" });
   const [geometry, setGeometry] = useState<AlertGeometry | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const list = useQuery({ queryKey: ["admin", "alerts"], queryFn: () => api.officialAlerts(CORSICA_BBOX) });

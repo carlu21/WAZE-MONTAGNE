@@ -35,7 +35,7 @@ export type BadgeSize = "sm" | "md";
 const TONE_COLORS: Record<BadgeTone, string> = {
   neutral: "var(--fg-muted)",
   primary: "var(--primary)",
-  accent: "var(--accent)",
+  accent: "var(--warning)",
   danger: "var(--danger)",
   success: "var(--success)",
   info: "var(--info)",

@@ -42,6 +42,7 @@ import { DoneStep } from "@/features/report/steps/DoneStep";
 /** État de navigation transmis à /map après une publication (recentrage et mise en avant). */
 export interface MapNavigationState {
   focus?: { lat: number; lng: number };
+  zoom?: number;
   publishedReportId?: string;
   queuedClientId?: string;
 }
@@ -52,7 +53,7 @@ export const TOAST_QUEUED = "Enregistré. Il sera publié dès le retour du rés
 
 const TITLES: Record<WizardStep, string> = {
   category: "Signaler",
-  subtype: fr.wizard.chooseSubtype,
+  subtype: "Précisez",
   details: "Détails",
   done: "Merci !",
 };

@@ -128,7 +128,12 @@ reportsRoutes.get("/:id", optionalAuth, (c) => {
   const body: ReportDetailResponse = {
     report,
     comments: commentRows.map((r) => toComment(r, r.userId ? (pseudoById.get(r.userId) ?? null) : null)),
-    confirmations: listConfirmations(row.id).map(toConfirmation),
+    // Le détail nominatif des votes (identifiant, commentaire de contestation) est réservé aux modérateurs.
+    confirmations: listConfirmations(row.id).map((r) => {
+      const viewer = c.get("user") as UserRow | undefined;
+      const conf = toConfirmation(r);
+      return viewer && isModerator(viewer) ? conf : { ...conf, userId: "", comment: null };
+    }),
     author,
   };
   return c.json(body);
@@ -141,6 +146,12 @@ reportsRoutes.patch("/:id", requireAuth, async (c) => {
     throw new HttpError(403, "forbidden", "Seul l'auteur ou un modérateur peut modifier ce signalement");
   }
   const input = await readJson(c, updateReportSchema);
+  // Même règle qu'à la création : une heure de fin passée rendrait le signalement irrécupérable.
+  if (input.endsAt && Date.parse(input.endsAt) <= Date.now()) {
+    throw new HttpError(400, "validation_error", "L'heure de fin doit être dans le futur", [
+      { path: "endsAt", message: "Doit être postérieure à maintenant" },
+    ]);
+  }
   const updated = updateReport(row, { ...input, subtype: input.subtype as ReportSubtype | undefined }, user);
   return c.json({ report: serializeReport(updated, { viewerId: user.id }) });
 });

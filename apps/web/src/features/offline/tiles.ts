@@ -44,15 +44,15 @@ export function estimateBytes(tileCount: number): number {
   return tileCount * BYTES_PER_TILE;
 }
 
-/** Liste des URL de tuiles, hôte réparti pour respecter la politique OpenTopoMap. */
+/** Liste des URL de tuiles (hôte a/b/c choisi comme MapLibre : (x + y) % 3). */
 export function tileUrls(bbox: BBox, minZoom = OFFLINE_MIN_ZOOM, maxZoom = OFFLINE_MAX_ZOOM): string[] {
   const urls: string[] = [];
-  let i = 0;
   for (const r of tileRanges(bbox, minZoom, maxZoom)) {
     for (let x = r.xMin; x <= r.xMax; x += 1) {
       for (let y = r.yMin; y <= r.yMax; y += 1) {
-        urls.push(`${TILE_HOSTS[i % TILE_HOSTS.length]}/${r.z}/${x}/${y}.png`);
-        i += 1;
+        // Même règle de choix d'hôte que MapLibre (urls[(x + y) % n]) : l'URL mise en cache
+        // est exactement celle que la carte demandera hors connexion.
+        urls.push(`${TILE_HOSTS[(x + y) % TILE_HOSTS.length]}/${r.z}/${x}/${y}.png`);
       }
     }
   }

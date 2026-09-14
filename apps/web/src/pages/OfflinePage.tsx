@@ -41,7 +41,11 @@ export default function OfflinePage() {
     },
     onSuccess: (zone) => {
       void queryClient.invalidateQueries({ queryKey: qk.offlineZones });
-      toast.success({ title: fr.offline.downloaded, description: `${zone.tileCount.toLocaleString("fr-FR")} tuiles · ${formatBytes(zone.bytesEstimate)} · ${zone.reports.length} signalements` });
+      if (zone.tileCount === 0) {
+        toast.warning({ title: "Données enregistrées, fonds de carte indisponibles", description: `${zone.reports.length} signalements, ${zone.waterPoints.length} points d'eau et ${zone.trails.length} sentiers sont disponibles hors connexion, mais aucune tuile n'a pu être téléchargée. Réessayez avec une meilleure connexion.` });
+      } else {
+        toast.success({ title: fr.offline.downloaded, description: `${zone.tileCount.toLocaleString("fr-FR")} tuiles · ${formatBytes(zone.bytesEstimate)} · ${zone.reports.length} signalements` });
+      }
     },
     onError: (e) => {
       if (e instanceof ZoneTooLargeError) toast.warning(fr.offline.areaTooLarge);
@@ -139,8 +143,9 @@ export default function OfflinePage() {
                         variant="secondary"
                         leftIcon={<MapPin />}
                         onClick={() => {
-                          setView({ lat: (z.bbox.south + z.bbox.north) / 2, lng: (z.bbox.west + z.bbox.east) / 2, zoom: 12 });
-                          navigate("/map");
+                          const center = { lat: (z.bbox.south + z.bbox.north) / 2, lng: (z.bbox.west + z.bbox.east) / 2 };
+                          setView({ ...center, zoom: 12 });
+                          navigate("/map", { state: { focus: center, zoom: 12 } });
                         }}
                       >
                         {fr.common.seeOnMap}

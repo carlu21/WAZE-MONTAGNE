@@ -5,7 +5,7 @@ import { UserPlus } from "lucide-react";
 import { PRACTICES, fr, registerSchema, type Practice } from "@mountain-live/core";
 import { Button, CategoryIcon, Chip, Field, Input, toast } from "@/components/ui";
 import { api } from "@/lib/api";
-import { useSessionStore } from "@/store/session";
+import { clearSessionCaches, useSessionStore } from "@/store/session";
 import { useUiStore } from "@/store/ui";
 import { AuthLayout } from "@/features/account/AuthLayout";
 import { authErrorMessage } from "@/features/account/authErrors";
@@ -32,6 +32,7 @@ export default function RegisterPage() {
   const register = useMutation({
     mutationFn: (input: Parameters<typeof api.auth.register>[0]) => api.auth.register(input),
     onSuccess: ({ token, user }) => {
+      void clearSessionCaches();
       setSession(token, user);
       setOnboardingDone(true);
       savePractices(user.practices);
@@ -101,7 +102,7 @@ export default function RegisterPage() {
             ))}
           </div>
         </fieldset>
-        <Field label={fr.auth.region} optional>
+        <Field label={fr.auth.region}>
           <Input size="lg" maxLength={80} placeholder="Ex. Corse, Haute-Corse…" value={region} onChange={(e) => setRegion(e.target.value)} />
         </Field>
         <label className="flex min-h-12 items-start gap-3 text-[15px] text-fg">

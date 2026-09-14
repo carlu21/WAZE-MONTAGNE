@@ -214,6 +214,11 @@ export const officialAlertSchema = z.object({
   ]),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime().nullable().optional(),
-  url: z.string().url().nullable().optional(),
+  url: z
+    .string()
+    .url()
+    .refine((u) => /^https?:\/\//i.test(u), "Seules les adresses http(s) sont acceptées")
+    .nullable()
+    .optional(),
 });
 export type OfficialAlertInput = z.infer<typeof officialAlertSchema>;

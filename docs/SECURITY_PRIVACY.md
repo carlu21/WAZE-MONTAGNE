@@ -13,7 +13,7 @@
 ## Authentification et sessions
 
 - Mots de passe hachés avec **scrypt** (`node:crypto`), sel aléatoire, comparaison en temps constant.
-- Jetons **JWT HS256** (`hono/jwt`), 30 jours ; secret via `JWT_SECRET` (obligatoire en production, valeur de développement par défaut).
+- Jetons **JWT HS256** (`hono/jwt`), 30 jours ; secret via `JWT_SECRET`. En production (`NODE_ENV=production`), l'API **refuse de démarrer** si le secret est absent, trop court (< 32 caractères) ou égal à la valeur de développement.
 - Un compte supprimé ou suspendu est refusé à chaque requête (401 / 403 `suspended`).
 - Le client purge sa session locale sur 401.
 
@@ -32,9 +32,11 @@
 ## Validation, limites et robustesse
 
 - Toutes les entrées sont validées par les schémas zod de `packages/core` (mêmes règles côté client) ; erreurs `400 validation_error` avec le chemin du champ.
-- Limites de débit en mémoire par adresse IP : `/auth/*` 20 requêtes / 10 min, `POST /reports` 20 / 10 min, `POST /presence` 60 / 10 min (429 + `Retry-After`).
+- Limites de débit en mémoire par adresse IP : `/auth/register` et `/auth/login` 20 requêtes / 10 min (la restauration de session `/auth/me` n'est pas comptée), `POST /reports` 20 / 10 min, `POST /presence` 60 / 10 min (429 + `Retry-After`). L'en-tête `X-Forwarded-For` n'est honoré que derrière un proxy listé dans `TRUST_PROXY` (dernière adresse ajoutée par le proxy), jamais sur la seule foi du client.
 - Photos : multipart, JPEG/PNG/WebP, 5 Mo maximum, type MIME vérifié, nom de fichier généré côté serveur, service statique sans traversée de répertoire.
-- Les descriptions et commentaires sont rendus en texte (jamais en HTML) côté client.
+- Les descriptions et commentaires sont rendus en texte (jamais en HTML) côté client ; les liens d'alertes officielles n'acceptent que `http(s)`.
+- La fiche publique d'un signalement ne révèle ni l'identité des votants ni leurs commentaires de contestation (réservés aux modérateurs).
+- Le service worker ne met jamais en cache les réponses personnelles (`/auth`, `/users`, `/notifications`, `/admin`, `/pro`) ; les caches de requêtes sont purgés à la connexion et à la déconnexion.
 - CORS restreint aux origines de `CORS_ORIGINS` en production.
 - Un signalement visé par ≥ 3 signalements de contenu distincts passe automatiquement en `disputed`.
 
@@ -42,7 +44,7 @@
 
 - **Consentement** explicite à l'inscription (case obligatoire, horodatée dans `consent_given_at`) avec lien vers la politique.
 - **Droit d'accès et de rectification** : profil et préférences modifiables ; l'e-mail n'est jamais montré aux autres.
-- **Droit à l'effacement** : `DELETE /users/me` anonymise irréversiblement (e-mail et hash effacés, pseudo « Utilisateur supprimé », pratiques/région/avatar supprimés), détache les contributions (conservées anonymisées pour la cohérence de la carte), supprime préférences, notifications, zones hors connexion, fiche partenaire et journal de réputation ; le jeton devient invalide. Côté appareil, « Effacer les données locales » vide IndexedDB et les caches.
+- **Droit à l'effacement** : `DELETE /users/me` anonymise irréversiblement (e-mail et hash effacés, pseudo « Utilisateur supprimé », pratiques/région/avatar supprimés), détache les contributions (conservées anonymisées pour la cohérence de la carte), efface les commentaires libres des votes et les précisions des signalements de contenu, supprime préférences, notifications, zones hors connexion, fiche partenaire et journal de réputation ; le jeton devient invalide. Côté appareil, « Effacer les données locales » vide IndexedDB et les caches.
 - **Minimisation** : présence agrégée uniquement, floutage, pas d'historique de déplacement, purge des signalements terminés après 90 jours.
 - **Transparence** : page `/legal` (règles de sécurité, données collectées, finalités, durées, droits, sources cartographiques).
 

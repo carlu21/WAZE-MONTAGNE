@@ -52,7 +52,7 @@ export default function ProDashboardPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg" style={{ paddingTop: "var(--safe-top)" }}>
+    <div className="flex h-full min-h-0 flex-col bg-bg">
       <TopBar
         variant="solid"
         title="Tableau de bord professionnel"

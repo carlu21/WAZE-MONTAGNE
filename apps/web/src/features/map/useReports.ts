@@ -28,6 +28,8 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { db } from "@/lib/db";
+import { offlineExtras } from "@/features/offline/extras";
+import { applyExcludedSubtypes } from "@/features/map/facets";
 import { useUiStore } from "@/store/ui";
 
 export interface ReportsData extends ListReportsResponse {
@@ -92,7 +94,8 @@ export async function reportsFromCache(f: CacheFilter): Promise<ReportsData> {
     });
   }
   reports.sort((a, b) => priorityOf(b) - priorityOf(a) || b.createdAt.localeCompare(a.createdAt));
-  const officialAlerts: OfficialAlert[] = [];
+  // Alertes officielles des zones téléchargées couvrant la vue (section 9).
+  const officialAlerts: OfficialAlert[] = (await offlineExtras(f.bbox, now.getTime())).officialAlerts;
   return { reports, officialAlerts, generatedAt: new Date(cachedAt ?? now.getTime()).toISOString(), fromCache: true, cachedAt };
 }
 
@@ -123,6 +126,7 @@ export function useReports(viewBBox: BBox | null, zoom: number): UseReportsResul
   const officialOnly = useUiStore((s) => s.showOfficialOnly);
   const online = useUiStore((s) => s.online);
   const position = useUiStore((s) => s.position);
+  const excludedSubtypes = useUiStore((s) => s.excludedSubtypes);
 
   const bboxKey = viewBBox ? `${viewBBox.west},${viewBBox.south},${viewBBox.east},${viewBBox.north}` : "";
   const zoomInt = Math.floor(zoom);
@@ -172,9 +176,11 @@ export function useReports(viewBBox: BBox | null, zoom: number): UseReportsResul
     if (online && queryBBox) void refetch();
   }, [online, queryBBox, refetch]);
 
+  const reports = useMemo(() => applyExcludedSubtypes(query.data?.reports ?? NO_REPORTS, excludedSubtypes), [query.data, excludedSubtypes]);
+
   return {
     data: query.data,
-    reports: query.data?.reports ?? NO_REPORTS,
+    reports,
     officialAlerts: query.data?.officialAlerts ?? NO_ALERTS,
     queryBBox,
     isLoading: query.isLoading,

@@ -83,10 +83,10 @@ export function Segmented<V extends string>({
             disabled={disabled || o.disabled}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-3 font-semibold leading-none",
+              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-1.5 font-semibold leading-none",
               "transition-[background-color,color,box-shadow] duration-150 ease-out",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50",
-              size === "lg" ? "h-12 text-[17px] [&_svg]:size-5" : "h-10 text-[15px] [&_svg]:size-5",
+              size === "lg" ? "h-14 text-[16px] [&_svg]:size-5" : "h-12 text-[14px] [&_svg]:size-5",
               checked ? "bg-surface text-primary shadow-sm" : "text-muted hover:text-fg",
             )}
           >
@@ -95,7 +95,7 @@ export function Segmented<V extends string>({
                 {o.icon}
               </span>
             ) : null}
-            {o.label ? <span className="truncate">{o.label}</span> : null}
+            {o.label ? <span className="line-clamp-2 whitespace-normal text-center leading-tight">{o.label}</span> : null}
           </button>
         );
       })}

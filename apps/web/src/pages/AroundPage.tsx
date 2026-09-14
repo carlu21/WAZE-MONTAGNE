@@ -16,12 +16,15 @@ import { useSessionStore } from "@/store/session";
 import { useUiStore } from "@/store/ui";
 import { useGeolocation } from "@/features/map/useGeolocation";
 import { AROUND_RADII, cardinalDirection, mergeAround, type AroundEntry } from "@/features/around/merge";
+import { applyExcludedSubtypes } from "@/features/map/facets";
+import { offlineExtras } from "@/features/offline/extras";
 
 export default function AroundPage() {
   const navigate = useNavigate();
   const position = useUiStore((s) => s.position);
   const online = useUiStore((s) => s.online);
   const filters = useUiStore((s) => s.filters);
+  const excludedSubtypes = useUiStore((s) => s.excludedSubtypes);
   const setView = useUiStore((s) => s.setView);
   const prefRadius = useSessionStore((s) => s.user?.preferences.aroundRadiusM);
   const [radius, setRadius] = useState<number>(() => (prefRadius && AROUND_RADII.includes(prefRadius as (typeof AROUND_RADII)[number]) ? prefRadius : 3000));
@@ -45,9 +48,9 @@ export default function AroundPage() {
 
   const entries: AroundEntry[] = useMemo(() => {
     if (!query.data || !center) return [];
-    const items = filters.length ? query.data.items.filter((r) => filters.includes(r.category)) : query.data.items;
+    const items = applyExcludedSubtypes(filters.length ? query.data.items.filter((r) => filters.includes(r.category)) : query.data.items, excludedSubtypes);
     return mergeAround(items, query.data.waterPoints, query.data.officialAlerts, center, haversineM);
-  }, [query.data, center, filters]);
+  }, [query.data, center, filters, excludedSubtypes]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -94,8 +97,10 @@ export default function AroundPage() {
           size="md"
           leftIcon={<MapIcon />}
           onClick={() => {
-            if (center) setView({ lat: center.lat, lng: center.lng, zoom: 14 });
-            navigate("/map");
+            if (center) {
+              setView({ lat: center.lat, lng: center.lng, zoom: 14 });
+              navigate("/map", { state: { focus: center, zoom: 14 } });
+            } else navigate("/map");
           }}
         >
           {fr.nav.map}
@@ -114,7 +119,13 @@ async function fromCache(center: { lat: number; lng: number }, radius: number) {
     .map(({ cachedAt: _c, ...r }) => ({ ...r, distanceM: Math.round(haversineM(center, r)) }))
     .filter((r) => (r.distanceM ?? 0) <= radius)
     .sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
-  return { center, radiusM: radius, items, officialAlerts: [], waterPoints: [] };
+  // Zones téléchargées : alertes officielles et points d'eau (section 9).
+  const extras = await offlineExtras(bbox, now);
+  const waterPoints = extras.waterPoints
+    .map((w) => ({ ...w, distanceM: Math.round(haversineM(center, w)) }))
+    .filter((w) => w.distanceM <= radius)
+    .sort((a, b) => a.distanceM - b.distanceM);
+  return { center, radiusM: radius, items, officialAlerts: extras.officialAlerts, waterPoints };
 }
 
 function AroundCard({ entry, center, onOpen }: { entry: AroundEntry; center: { lat: number; lng: number }; onOpen: (id: string) => void }) {
@@ -125,7 +136,7 @@ function AroundCard({ entry, center, onOpen }: { entry: AroundEntry; center: { l
         <DistanceBlock meters={entry.distanceM} dir={cardinalDirection(center, { lat: a.centroidLat, lng: a.centroidLng })} />
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-bold text-fg">{a.title}</p>
-          <p className="text-[13px] text-muted">
+          <p className="text-[14px] text-muted">
             {a.organisation}
             {a.endsAt ? ` · ${formatUntil(a.endsAt)}` : ""}
           </p>
@@ -148,7 +159,7 @@ function AroundCard({ entry, center, onOpen }: { entry: AroundEntry; center: { l
           </span>
           <div className="min-w-0">
             <p className="truncate text-[16px] font-bold text-fg">{w.name}</p>
-            <p className="text-[13px] text-muted">{w.lastState === "dry" ? "Signalée sèche" : w.lastState === "active" ? "Active" : "État inconnu"}{w.lastStateAt ? " · " : ""}{w.lastStateAt ? <RelativeTime date={w.lastStateAt} /> : null}</p>
+            <p className="text-[14px] text-muted">{w.lastState === "dry" ? "Signalée sèche" : w.lastState === "active" ? "Active" : "État inconnu"}{w.lastStateAt ? " · " : ""}{w.lastStateAt ? <RelativeTime date={w.lastStateAt} /> : null}</p>
           </div>
         </div>
       </div>
@@ -166,7 +177,7 @@ function AroundCard({ entry, center, onOpen }: { entry: AroundEntry; center: { l
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-bold leading-tight text-fg">{phrases.aroundItem(entry.distanceM, def?.label ?? r.subtype).replace(/^À [^:]+: /, "")}</p>
-          <p className="text-[13px] text-muted">
+          <p className="text-[14px] text-muted">
             <RelativeTime date={r.createdAt} prefix="Signalé" />
             {r.endsAt ? ` · ${formatUntil(r.endsAt)}` : ""}
             {r.zone ? ` · ${r.zone}` : ""}

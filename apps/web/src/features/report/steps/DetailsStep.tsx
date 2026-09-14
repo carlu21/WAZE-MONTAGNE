@@ -89,7 +89,7 @@ export function DetailsStep({ draft, dispatch, errors, positionStatus, positionM
           <CategoryIcon name={def.icon} size={30} strokeWidth={2.25} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[20px] font-bold leading-tight text-fg">{def.label}</h2>
+          <h2 className="break-words text-[20px] font-bold leading-tight text-fg">{def.label}</h2>
           <p className="truncate text-[14px] text-muted">{cat.label}</p>
         </div>
         <Button variant="ghost" size="md" leftIcon={<Pencil />} onClick={onChangeSubtype} disabled={disabled} aria-label="Modifier le type de signalement">

@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Compass, History, Mountain } from "lucide-react";
+import { Compass, History, Mountain, Navigation } from "lucide-react";
 import { fr, type Area } from "@mountain-live/core";
 import { CategoryIcon, EmptyState, ListItem, SearchField, SkeletonListItem, TopBar } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -86,6 +86,9 @@ export default function ExplorePage() {
             )
           ) : (
             <>
+              <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                <ListItem icon={<Navigation />} title={fr.nav.around} subtitle="Ce qui se passe à proximité, trié par distance" to="/around" chevron />
+              </div>
               <section>
                 <h2 className="mb-1 flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide text-muted">
                   <Mountain className="size-4" aria-hidden="true" /> Secteurs populaires — pilote Corse

@@ -14,14 +14,28 @@ interface Bucket {
 
 const store = new Map<string, Bucket>();
 
-function clientIp(c: Context): string {
-  const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  const real = c.req.header("x-real-ip");
-  if (real) return real;
+function socketIp(c: Context): string {
   // Serveur Node : l'adresse distante est accessible via l'objet `incoming`.
   const incoming = (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming;
   return incoming?.socket?.remoteAddress ?? "local";
+}
+
+/**
+ * Adresse cliente : l'en-tête X-Forwarded-For n'est honoré que si la requête provient d'un
+ * reverse-proxy de confiance (TRUST_PROXY) ; on prend alors l'adresse ajoutée par ce proxy
+ * (dernière entrée), jamais la première, contrôlée par le client.
+ */
+function clientIp(c: Context): string {
+  const socket = socketIp(c);
+  const trusted = config.trustProxy;
+  if (trusted.length === 0 || !(trusted.includes(socket) || trusted.includes("*"))) return socket;
+  const forwarded = c.req.header("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  const real = c.req.header("x-real-ip");
+  return real ?? socket;
 }
 
 export interface RateLimitOptions {

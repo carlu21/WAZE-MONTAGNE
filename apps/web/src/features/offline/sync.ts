@@ -63,14 +63,20 @@ export async function flushImpl(): Promise<{ sent: number; failed: number }> {
         sent += 1;
       } catch (e) {
         failed += 1;
-        const attempts = item.attempts + 1;
         const lastError = e instanceof Error ? e.message : String(e);
+        if (!(e instanceof ApiError)) {
+          // Erreur réseau (serveur injoignable, délai) : l'action est conservée sans compter d'échec ;
+          // on réessaiera au prochain retour du réseau. Jamais de perte de données pour cause de réseau.
+          await db.outbox.update(item.id, { lastError });
+          break;
+        }
+        const attempts = item.attempts + 1;
         if (isPermanentError(e) || attempts >= MAX_ATTEMPTS) {
           await db.outbox.delete(item.id);
           toast.warning({ title: "Action hors connexion abandonnée", description: item.kind === "create_report" ? `Signalement non publié : ${lastError}` : `Confirmation non envoyée : ${lastError}` });
         } else {
           await db.outbox.update(item.id, { attempts, lastError });
-          if (e instanceof ApiError && e.status === 401) break; // session expirée : on s'arrête
+          if (e.status === 401) break; // session expirée : on s'arrête
         }
       }
     }

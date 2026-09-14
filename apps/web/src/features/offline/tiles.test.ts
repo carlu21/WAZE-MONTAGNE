@@ -13,5 +13,10 @@ describe("tuiles hors connexion", () => {
     expect(ranges[0].z).toBe(10);
     expect(countTiles(bbox, 10, 12)).toBe(ranges.reduce((n, r) => n + r.count, 0));
     expect(tileUrls(bbox, 10, 10)[0]).toMatch(/^https:\/\/[abc]\.tile\.opentopomap\.org\/10\/\d+\/\d+\.png$/);
+    // Hôte identique à celui que choisit MapLibre pour la tuile (x + y) % 3.
+    for (const u of tileUrls(bbox, 12, 12)) {
+      const m = u.match(/^https:\/\/([abc])\.tile\.opentopomap\.org\/12\/(\d+)\/(\d+)\.png$/)!;
+      expect(["a", "b", "c"][(Number(m[2]) + Number(m[3])) % 3]).toBe(m[1]);
+    }
   });
 });

@@ -21,7 +21,9 @@ import { formatDateFr } from "../services/util";
  */
 export const authRoutes = new Hono<AppEnv>();
 
-authRoutes.use("*", rateLimit({ name: "auth", ...config.rateLimit.auth }));
+// Limite de débit sur les tentatives (inscription / connexion) uniquement : la restauration de session (/me) n'est pas comptée.
+authRoutes.use("/register", rateLimit({ name: "auth", ...config.rateLimit.auth }));
+authRoutes.use("/login", rateLimit({ name: "auth", ...config.rateLimit.auth }));
 
 authRoutes.post("/register", async (c) => {
   const input = await readJson(c, registerSchema);

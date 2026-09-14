@@ -12,6 +12,8 @@ export interface AlertPrefs {
   categories: readonly ReportCategory[];
 }
 
+const ALL_CATEGORIES: readonly ReportCategory[] = ["danger", "path", "activity", "animals", "water", "crowd"];
+
 export const DEFAULT_ALERT_PREFS: AlertPrefs = { enabled: true, radiusM: 500, categories: ["danger", "activity", "animals", "path"] };
 
 export interface ProximityAlert {
@@ -35,6 +37,8 @@ export function computeAlerts(
   now: number = Date.now(),
 ): ProximityAlert[] {
   if (!prefs.enabled) return [];
+  // Aucune catégorie choisie = toutes (même convention que les filtres de la carte).
+  const categories: readonly ReportCategory[] = prefs.categories.length ? prefs.categories : ALL_CATEGORIES;
   const out: ProximityAlert[] = [];
 
   for (const a of officialAlerts) {
@@ -46,7 +50,7 @@ export function computeAlerts(
   }
 
   const near = reports
-    .filter((r) => VISIBLE.has(r.status) && prefs.categories.includes(r.category) && new Date(r.expiresAt).getTime() > now && (!r.endsAt || new Date(r.endsAt).getTime() > now))
+    .filter((r) => VISIBLE.has(r.status) && categories.includes(r.category) && new Date(r.expiresAt).getTime() > now && (!r.endsAt || new Date(r.endsAt).getTime() > now))
     .map((r) => ({ r, d: haversineM(position, r) }))
     .filter(({ d }) => d <= prefs.radiusM)
     .sort((a, b) => a.d - b.d);

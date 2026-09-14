@@ -44,7 +44,7 @@ export interface ReportPreviewSheetProps {
 }
 
 /** Hauteur du mode « aperçu » (px) : en-tête, badges, méta, actions rapides, bouton fiche. */
-export const PREVIEW_PEEK_HEIGHT = 348;
+export const PREVIEW_PEEK_HEIGHT = 404;
 
 const QUICK_VOTES: readonly { kind: ConfirmationKind; label: string; icon: React.ReactNode }[] = [
   { kind: "still_present", label: fr.confirmations.stillPresent, icon: <Check /> },
@@ -159,7 +159,7 @@ export function ReportPreviewSheet({ report, onClose }: ReportPreviewSheetProps)
         {isOwn ? (
           <p className="rounded-lg bg-surface-2 px-3 py-2 text-[14px] text-muted">Votre signalement : la communauté peut le confirmer.</p>
         ) : (
-          <div className="flex gap-2" role="group" aria-label={fr.confirmations.question}>
+          <div className="grid grid-cols-1 gap-2" role="group" aria-label={fr.confirmations.question}>
             {QUICK_VOTES.map(({ kind, label: voteLabel, icon }) => {
               const active = report.myConfirmation === kind;
               return (

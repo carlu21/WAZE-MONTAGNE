@@ -31,9 +31,9 @@ function ReportRow({ r, onOpen }: { r: Report; onOpen: () => void }) {
           <RelativeTime date={r.createdAt} prefix="Signalé" />
           {r.endsAt ? <span>· {formatUntil(r.endsAt)}</span> : null}
           {r.dangerLevel ? <DangerPill level={r.dangerLevel} /> : null}
+          <ConfidenceBadge label={r.confidenceLabel} />
         </span>
       }
-      trailing={<ConfidenceBadge label={r.confidenceLabel} />}
       onClick={onOpen}
       chevron
     />
@@ -82,7 +82,7 @@ export default function AreaPage() {
 
   const openMap = () => {
     setView({ lat: area.lat, lng: area.lng, zoom });
-    navigate("/map");
+    navigate("/map", { state: { focus: { lat: area.lat, lng: area.lng }, zoom } });
   };
   const download = () => {
     const b = bbox ?? { west: area.lng - 0.08, south: area.lat - 0.06, east: area.lng + 0.08, north: area.lat + 0.06 };
@@ -183,8 +183,10 @@ export default function AreaPage() {
                 subtitle={`${TRAIL_TYPE[t.type]} · ${t.distanceKm.toLocaleString("fr-FR")} km · +${t.elevationGainM} m · ${DIFFICULTY[t.difficulty]}`}
                 onClick={() => {
                   const first = t.geometry.type === "LineString" ? t.geometry.coordinates[Math.floor(t.geometry.coordinates.length / 2)] : null;
-                  if (first) setView({ lat: first[1], lng: first[0], zoom: 13 });
-                  navigate("/map");
+                  if (first) {
+                    setView({ lat: first[1], lng: first[0], zoom: 13 });
+                    navigate("/map", { state: { focus: { lat: first[1], lng: first[0] }, zoom: 13 } });
+                  } else navigate("/map");
                 }}
                 chevron
               />

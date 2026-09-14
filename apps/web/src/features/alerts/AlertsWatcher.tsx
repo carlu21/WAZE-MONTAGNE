@@ -45,78 +45,79 @@ export function AlertsWatcher() {
   const notified = useRef<Map<string, number> | null>(null);
   const lastPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastRun = useRef(0);
+  const runRef = useRef<(force?: boolean) => Promise<void>>(async () => undefined);
 
-  useEffect(() => {
+  // Passe de détection : lue via une ref pour que l'intervalle ne dépende ni de la position ni des préférences.
+  runRef.current = async (force = false) => {
     if (!notified.current) notified.current = loadNotified();
-    let cancelled = false;
+    const pos = useUiStore.getState().position;
+    if (!pos) return;
+    const moved = !lastPos.current || haversineM(lastPos.current, pos) >= ALERT_MOVE_M;
+    const stale = Date.now() - lastRun.current >= ALERT_TICK_MS;
+    if (!force && !moved && !stale) return;
+    lastPos.current = { lat: pos.lat, lng: pos.lng };
+    lastRun.current = Date.now();
 
-    const run = async (force = false) => {
-      const pos = useUiStore.getState().position;
-      if (!pos) return;
-      const moved = !lastPos.current || haversineM(lastPos.current, pos) >= ALERT_MOVE_M;
-      const stale = Date.now() - lastRun.current >= ALERT_TICK_MS;
-      if (!force && !moved && !stale) return;
-      lastPos.current = { lat: pos.lat, lng: pos.lng };
-      lastRun.current = Date.now();
-
-      const prefs: AlertPrefs = prefsFromUser ?? DEFAULT_ALERT_PREFS;
-      // Signalements connus : cache TanStack (carte, autour de moi) + cache local Dexie.
-      const seen = new Map<string, Report>();
-      const alerts = new Map<string, OfficialAlert>();
-      for (const [, data] of queryClient.getQueriesData<{ reports?: Report[]; officialAlerts?: OfficialAlert[]; items?: Report[] }>({ queryKey: qk.reportsRoot })) {
-        for (const r of data?.reports ?? []) seen.set(r.id, r);
-        for (const a of data?.officialAlerts ?? []) alerts.set(a.id, a);
-      }
-      for (const [, data] of queryClient.getQueriesData<{ items?: Report[]; officialAlerts?: OfficialAlert[] }>({ queryKey: ["around"] })) {
-        for (const r of data?.items ?? []) seen.set(r.id, r);
-        for (const a of data?.officialAlerts ?? []) alerts.set(a.id, a);
-      }
-      try {
-        const cached = await db.reports.toArray();
-        for (const c of cached) if (!seen.has(c.id)) seen.set(c.id, c);
-      } catch {
-        /* IndexedDB indisponible */
-      }
-      if (cancelled) return;
-      const found = computeAlerts(pos, [...seen.values()], [...alerts.values()], prefs, new Set(notified.current!.keys()));
-      for (const a of found.slice(0, 3)) {
-        for (const k of notifiedKeysFor(a)) notified.current!.set(k, Date.now());
-        toast.show({
-          title: a.message,
-          tone: a.severity === "info" ? "info" : "warning",
-          duration: 0,
-          assertive: a.severity !== "info",
-          action: a.reportId ? { label: "Voir", onClick: () => navigate(`/reports/${a.reportId}`) } : undefined,
-        });
-        if (a.severity !== "info" && typeof navigator !== "undefined" && "vibrate" in navigator) {
-          try {
-            navigator.vibrate(200);
-          } catch {
-            /* ignore */
-          }
-        }
-        if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
-          try {
-            new Notification("Mountain Live", { body: a.message, tag: a.key });
-          } catch {
-            /* ignore */
-          }
+    const prefs: AlertPrefs = prefsFromUser ?? DEFAULT_ALERT_PREFS;
+    // Signalements connus : cache TanStack (carte, autour de moi) + cache local Dexie.
+    const seen = new Map<string, Report>();
+    const alerts = new Map<string, OfficialAlert>();
+    for (const [, data] of queryClient.getQueriesData<{ reports?: Report[]; officialAlerts?: OfficialAlert[] }>({ queryKey: qk.reportsRoot })) {
+      for (const r of data?.reports ?? []) seen.set(r.id, r);
+      for (const a of data?.officialAlerts ?? []) alerts.set(a.id, a);
+    }
+    for (const [, data] of queryClient.getQueriesData<{ items?: Report[]; officialAlerts?: OfficialAlert[] }>({ queryKey: ["around"] })) {
+      for (const r of data?.items ?? []) seen.set(r.id, r);
+      for (const a of data?.officialAlerts ?? []) alerts.set(a.id, a);
+    }
+    try {
+      for (const c of await db.reports.toArray()) if (!seen.has(c.id)) seen.set(c.id, c);
+    } catch {
+      /* IndexedDB indisponible */
+    }
+    const found = computeAlerts(pos, [...seen.values()], [...alerts.values()], prefs, new Set(notified.current.keys()));
+    for (const a of found.slice(0, 3)) {
+      for (const k of notifiedKeysFor(a)) notified.current.set(k, Date.now());
+      toast.show({
+        title: a.message,
+        tone: a.severity === "info" ? "info" : "warning",
+        duration: 0,
+        assertive: a.severity !== "info",
+        action: a.reportId ? { label: "Voir", onClick: () => navigate(`/reports/${a.reportId}`) } : undefined,
+      });
+      if (a.severity !== "info" && typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try {
+          navigator.vibrate(200);
+        } catch {
+          /* ignore */
         }
       }
-      if (found.length) saveNotified(notified.current!);
-    };
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+        try {
+          new Notification("Mountain Live", { body: a.message, tag: a.key });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (found.length) saveNotified(notified.current);
+  };
 
-    void run(true);
+  // Nouvelle position : passe immédiate (seuil de 50 m géré dans la passe).
+  useEffect(() => {
+    void runRef.current(false);
+  }, [position?.lat, position?.lng]);
+
+  // Horloge indépendante de la position : détection périodique et ping de présence (limité à 5 min).
+  useEffect(() => {
+    void runRef.current(true);
+    void maybePingPresence();
     const t = window.setInterval(() => {
-      void run();
+      void runRef.current(false);
       void maybePingPresence();
     }, ALERT_TICK_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(t);
-    };
-    // La position déclenche une passe immédiate ; les préférences sont lues à chaque passe.
-  }, [position?.lat, position?.lng, prefsFromUser, queryClient, navigate]);
+    return () => window.clearInterval(t);
+  }, []);
 
   return null;
 }

@@ -10,7 +10,7 @@ import { IconButton, SafetyNotice, TopBar } from "@/components/ui";
 export default function LegalPage() {
   const navigate = useNavigate();
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg" style={{ paddingTop: "var(--safe-top)" }}>
+    <div className="flex h-full min-h-0 flex-col bg-bg">
       <TopBar
         variant="solid"
         title="Sécurité et confidentialité"
