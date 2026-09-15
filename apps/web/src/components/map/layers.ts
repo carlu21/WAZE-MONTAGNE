@@ -39,6 +39,14 @@ export const LAYER_IDS = {
   /** Carte de fréquentation (réseau vivant). */
   heatPathsCasing: "ml-heat-paths-casing",
   heatPaths: "ml-heat-paths",
+  /** Écran d'accueil : départs de randonnée, tracé sélectionné, position orientée. */
+  homeTrailCasing: "ml-home-trail-casing",
+  homeTrail: "ml-home-trail",
+  homeHeads: "ml-home-heads",
+  homeHeadLabels: "ml-home-head-labels",
+  homeAccuracy: "ml-home-accuracy",
+  homeMarkerHalo: "ml-home-marker-halo",
+  homeMarker: "ml-home-marker",
 } as const;
 
 export const SOURCE_IDS = {
@@ -54,6 +62,9 @@ export const SOURCE_IDS = {
   navTrack: "ml-nav-track",
   navReturn: "ml-nav-return",
   navEvents: "ml-nav-events",
+  homeTrail: "ml-home-trail",
+  homeHeads: "ml-home-heads",
+  homeUser: "ml-home-user",
   navUser: "ml-nav-user",
   heatPaths: "ml-heat-paths",
 } as const;
@@ -65,6 +76,8 @@ export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.heatPaths,
   LAYER_IDS.navPathsCasing,
   LAYER_IDS.navPaths,
+  LAYER_IDS.homeTrailCasing,
+  LAYER_IDS.homeTrail,
   LAYER_IDS.alertsFill,
   LAYER_IDS.alertsOutline,
   LAYER_IDS.navRouteCasing,
@@ -83,10 +96,15 @@ export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.userDotHalo,
   LAYER_IDS.userDot,
   LAYER_IDS.searchMarker,
+  LAYER_IDS.homeHeads,
+  LAYER_IDS.homeHeadLabels,
   LAYER_IDS.navEvents,
   LAYER_IDS.navAccuracy,
   LAYER_IDS.navMarkerHalo,
   LAYER_IDS.navMarker,
+  LAYER_IDS.homeAccuracy,
+  LAYER_IDS.homeMarkerHalo,
+  LAYER_IDS.homeMarker,
 ];
 
 /** Identifiant de la première couche déjà présente devant se trouver au-dessus de `layerId`. */

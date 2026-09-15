@@ -462,3 +462,22 @@ export const campaignSchema = z.object({
   urls: z.array(publicUrlSchema).max(50).default([]),
 });
 export type CampaignInput = z.infer<typeof campaignSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Écran d'accueil : randonnées autour de vous                          */
+/* ------------------------------------------------------------------ */
+
+export const nearbySortSchema = z.enum(["closest", "popular", "easiest", "shortest", "quietest"]);
+
+/** Recherche de proximité (sections 10, 13, 17, 18). */
+export const nearbyQuerySchema = z.object({
+  // Paramètres d'URL : ils arrivent en texte, d'où la conversion explicite.
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  activity: z.union([activityModeSchema, z.literal("all")]).default("all"),
+  sort: nearbySortSchema.default("closest"),
+  limit: z.coerce.number().int().min(1).max(30).default(12),
+  /** Rayon imposé (m). Absent : la recherche s'élargit d'elle-même. */
+  radiusM: z.coerce.number().int().min(500).max(100_000).optional(),
+});
+export type NearbyQuery = z.infer<typeof nearbyQuerySchema>;

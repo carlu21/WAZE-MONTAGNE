@@ -59,3 +59,49 @@ Cinq gestes, moins de 20 secondes. Hors réseau, le signalement est mis en atten
 - **Hors connexion** : bannière « Mode hors connexion » ; carte, fiche et « Autour de moi » lisent le cache local ; les actions sont mises en file d'attente ; « Synchronisation effectuée » au retour du réseau.
 - **Compte suspendu** : l'API refuse (403 `suspended`) avec la date de fin ; le message est affiché à la connexion.
 - **Rôles** : le profil affiche « Back-office » (modération) et « Tableau de bord professionnel » selon le rôle.
+
+## Écran d'accueil : la carte d'abord
+
+> L'application s'ouvre sur la carte. Pas de tableau de bord, pas de liste de randonnées avant elle.
+
+L'architecture d'usage est celle d'une application de navigation grand public, transposée à la montagne : carte dominante, position au centre, quelques boutons flottants, un panneau qui remonte du bas, et des suggestions immédiatement accessibles sous la barre de recherche.
+
+```
+┌──────────────────────────────┐
+│ [couches]                    │  discret, en haut à gauche
+│                              │
+│            CARTE             │  ~60 % de la hauteur au repos
+│          ▲ position          │  marqueur directionnel : position ET cap
+│      🥾 départs proposés     │
+│ [recentrer]      (SIGNALER)  │  deux actions, grandes, atteignables au pouce
+├──────────────────────────────┤
+│ ══  « Où va-t-on ? »         │  palier d'aperçu
+│ Randonnées autour de vous    │  ← remplace « Domicile / Travail »
+│ [carte][carte][carte] →      │  défilement horizontal
+└──────────────────────────────┘
+```
+
+Trois paliers pour le panneau : aperçu (`PEEK_HEIGHT`, calibré pour laisser ~60 % de carte), moitié, plein écran. Développé, il ajoute les classements (plus proches, plus populaires, plus faciles, plus courtes, moins fréquentées) et les filtres rapides (durée, activité).
+
+### Les deux distances
+
+C'est la confusion qui rendrait l'écran trompeur, et elle est traitée comme telle :
+
+| | Champ | Formulation | Place dans la carte |
+| --- | --- | --- | --- |
+| De vous au départ | `approachM` | « À 4,2 km de vous » | sa propre ligne, en vert, avec une épingle |
+| Longueur du parcours | `lengthM` | « 9,4 km » | ligne des chiffres du parcours |
+
+Les deux formulations sont produites par des fonctions distinctes (`approachLabel`, `lengthLabel`), volontairement dissemblables, et un test vérifie qu'elles ne coïncident jamais — même pour une valeur identique.
+
+### Ce qui vient à l'utilisateur
+
+`GET /trails/nearby?lat&lng&activity&sort&limit` cherche dans un rayon **adaptatif** : 10 km, puis 25, puis 50 tant que les résultats sont trop rares (`selectRadius`). La réponse dit quel rayon a été retenu et s'il a fallu l'élargir — l'interface l'affiche plutôt que de laisser croire à un secteur pauvre.
+
+Chaque randonnée porte, en plus des deux distances : durée (observée ou estimée, marquée d'un `≈` quand elle n'est qu'estimée), dénivelé, difficulté, forme (boucle, aller-retour, linéaire), fréquentation et **signalements actifs**. Ce dernier point est ce qui sépare cette application d'une application de randonnée ordinaire : « Battue signalée » s'affiche sur la carte de la randonnée, avant qu'on parte.
+
+Une fréquentation inconnue n'est jamais présentée comme un chemin calme : elle n'est pas affichée du tout.
+
+### Sélectionner une randonnée
+
+Sélectionner ne change pas de page (c'est le point d'ergonomie essentiel) : la carte se recentre, le tracé complet apparaît, et une fiche monte depuis le bas. L'action principale dépend de la distance au départ — on ne propose pas de « démarrer » une randonnée dont le départ est à 7 km, on propose d'y aller (`AT_TRAILHEAD_M`).

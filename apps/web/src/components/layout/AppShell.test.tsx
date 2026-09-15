@@ -26,12 +26,21 @@ describe("<AppShell />", () => {
     renderShell();
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.textContent?.trim())).toEqual(["Itinéraire", "Carte", "Signaler", "Explorer", "Profil"]);
+    expect(links.map((l) => l.textContent?.trim())).toEqual(["Accueil", "Carte", "Signaler", "Explorer", "Profil"]);
     expect(within(nav).getByRole("link", { name: "Signaler" })).toHaveAttribute("href", "/report");
     expect(within(nav).getByRole("link", { name: "Carte" })).toHaveAttribute("href", "/map");
     expect(within(nav).getByRole("link", { name: "Explorer" })).toHaveAttribute("href", "/explore");
-    expect(within(nav).getByRole("link", { name: "Itinéraire" })).toHaveAttribute("href", "/navigate");
+    expect(within(nav).getByRole("link", { name: "Accueil" })).toHaveAttribute("href", "/home");
     expect(within(nav).getByRole("link", { name: "Profil" })).toHaveAttribute("href", "/profile");
+  });
+
+  it("renonce à son bouton « Signaler » sur un écran qui porte déjà le sien", () => {
+    renderShell("/home");
+    const nav = screen.getByRole("navigation", { name: "Navigation principale" });
+    const links = within(nav).getAllByRole("link");
+    // Quatre entrées, aucun doublon du bouton de signalement.
+    expect(links.map((l) => l.textContent?.trim())).toEqual(["Accueil", "Carte", "Explorer", "Profil"]);
+    expect(within(nav).queryByRole("link", { name: "Signaler" })).toBeNull();
   });
 
   it("marque l'entrée active avec aria-current", () => {

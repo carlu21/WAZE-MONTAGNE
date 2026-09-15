@@ -40,4 +40,7 @@ export const qk = {
   collectTerritories: ["collectTerritories"] as const,
   collectPlan: (id: string) => ["collectPlan", id] as const,
   segmentSources: (id: string) => ["segmentSources", id] as const,
+  // Écran d'accueil : randonnées autour de la position.
+  nearby: (p: Record<string, unknown>) => ["nearby", p] as const,
+  trailGeometry: (id: string) => ["trailGeometry", id] as const,
 };

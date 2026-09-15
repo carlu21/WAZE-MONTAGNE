@@ -601,7 +601,30 @@ export function seedReference(): { areas: number; trails: number; waterPoints: n
   }
   // Réseau de chemins de démonstration (les segments OSM importés, s'il y en a, sont conservés).
   const network = upsertPaths(buildDemoNetwork(TRAILS));
+  linkPathsToTrails();
   return { areas: AREAS.length, trails: TRAILS.length, waterPoints: WATER.length, paths: network };
+}
+
+/**
+ * Rattache chaque segment de démonstration à l'itinéraire dont il est issu.
+ *
+ * Sans ce lien, la fréquentation d'une randonnée reste muette : les passages
+ * sont portés par les SEGMENTS, l'écran d'accueil les lit par ITINÉRAIRE. Les
+ * segments de démonstration sont découpés depuis `d_<trailId>`, le
+ * rattachement est donc déductible de leur identifiant — un import réel, lui,
+ * devra le porter explicitement.
+ */
+function linkPathsToTrails(): number {
+  let linked = 0;
+  for (const trail of TRAILS) {
+    const prefix = `d_${trail.id}`;
+    linked += db
+      .update(paths)
+      .set({ trailId: trail.id })
+      .where(sql`${paths.id} = ${prefix} OR ${paths.id} LIKE ${`${prefix}\_%`} ESCAPE '\\'`)
+      .run().changes;
+  }
+  return linked;
 }
 
 function insertUsers(): Map<string, UserRow> {

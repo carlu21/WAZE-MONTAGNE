@@ -12,6 +12,7 @@ const SplashPage = lazy(() => import("./pages/SplashPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const ExplorePage = lazy(() => import("./pages/ExplorePage"));
 const AreaPage = lazy(() => import("./pages/AreaPage"));
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
       </AppShell>
     ),
     children: [
+      { path: "/home", element: <S><HomePage /></S> },
       { path: "/navigate", element: <S><NavigationPage /></S> },
       { path: "/map", element: <S><MapPage /></S> },
       { path: "/explore", element: <S><ExplorePage /></S> },

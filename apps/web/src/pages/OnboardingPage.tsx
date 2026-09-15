@@ -164,7 +164,7 @@ export default function OnboardingPage() {
             <LinkButton to="/auth/login" size="lg" variant="outline" fullWidth onClick={() => setOnboardingDone(true)}>
               {fr.auth.login}
             </LinkButton>
-            <Button size="lg" variant="ghost" fullWidth onClick={() => done("/navigate")}>
+            <Button size="lg" variant="ghost" fullWidth onClick={() => done("/home")}>
               {fr.auth.continueAsGuest}
             </Button>
           </>

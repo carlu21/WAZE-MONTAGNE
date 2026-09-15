@@ -57,6 +57,9 @@ import {
   type CommentInput,
   type FlagInput,
   type OfficialAlertInput,
+  type NearbyResponse,
+  type NearbySort,
+  type TrailGeometryResponse,
   type CampaignInput,
   type CampaignResponse,
   type DataSourceDto,
@@ -207,6 +210,11 @@ export const api = {
   trails: (bbox: BBox) => request<{ trails: Trail[] }>("GET", `/trails${q({ bbox: bboxParam(bbox) })}`),
   trail: (id: string) => request<{ trail: Trail }>("GET", `/trails/${encodeURIComponent(id)}`),
   trailSummaries: (bbox: BBox) => request<{ trails: TrailSummary[] }>("GET", `/trails${q({ bbox: bboxParam(bbox), summary: 1 })}`),
+  /** Randonnées autour d'une position (écran d'accueil) : rayon adaptatif côté serveur. */
+  nearbyTrails: (p: { lat: number; lng: number; activity?: string; sort?: NearbySort; limit?: number; radiusM?: number }) =>
+    request<NearbyResponse>("GET", `/trails/nearby${q(p)}`),
+  /** Tracé complet d'un itinéraire, chargé à la sélection d'une carte. */
+  trailGeometry: (id: string) => request<TrailGeometryResponse>("GET", `/trails/${encodeURIComponent(id)}/geometry`),
   networkStats: () => request<NetworkStats>("GET", "/paths/stats"),
   paths: (bbox: BBox) => request<{ paths: PathSegment[]; truncated: boolean }>("GET", `/paths${q({ bbox: bboxParam(bbox) })}`),
   waterPoints: (bbox: BBox) =>

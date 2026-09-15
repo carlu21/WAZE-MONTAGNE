@@ -27,7 +27,7 @@ import { Fab } from "@/components/ui/Button";
 import { useIsDesktop } from "@/components/ui/hooks";
 
 export interface NavEntry {
-  key: "navigate" | "map" | "explore" | "profile";
+  key: "home" | "map" | "explore" | "profile";
   to: string;
   label: string;
   icon: ComponentType<LucideProps>;
@@ -37,11 +37,11 @@ export interface NavEntry {
 
 /**
  * Les quatre entrées de navigation ; « Signaler » est le bouton flottant central.
- * « Itinéraire » (démarrer une navigation GPS) est l'écran d'accueil ; la communauté
- * est accessible depuis Explorer et Profil.
+ * « Accueil » est LA carte : l'application s'ouvre dessus, avec la position et les
+ * randonnées alentour. La communauté est accessible depuis Explorer et Profil.
  */
 export const NAV_ENTRIES: readonly NavEntry[] = [
-  { key: "navigate", to: "/navigate", label: fr.nav.navigate, icon: Navigation2, matches: ["/navigate"] },
+  { key: "home", to: "/home", label: "Accueil", icon: Navigation2, matches: ["/home", "/navigate"] },
   { key: "map", to: "/map", label: fr.nav.map, icon: MapIcon, matches: ["/map", "/around", "/reports"] },
   { key: "explore", to: "/explore", label: fr.nav.explore, icon: Compass, matches: ["/explore", "/community"] },
   { key: "profile", to: "/profile", label: fr.nav.profile, icon: UserRound, matches: ["/profile", "/notifications", "/offline"] },
@@ -104,21 +104,34 @@ function NavItem({ entry, active, badge = 0, layout }: NavItemProps) {
   );
 }
 
+/**
+ * Écrans qui portent DÉJÀ leur propre bouton « Signaler », posé sur la carte à
+ * portée de pouce. La barre y renonce au sien : deux boutons identiques sur le
+ * même écran, c'est la surcharge qu'on cherche à éviter.
+ */
+export const ROUTES_WITH_OWN_REPORT: readonly string[] = ["/home"];
+
+export function ownsReportAction(pathname: string): boolean {
+  return ROUTES_WITH_OWN_REPORT.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 function BottomNav({ pathname, unread }: { pathname: string; unread: number }) {
   const [navigateEntry, map, explore, profile] = NAV_ENTRIES;
+  const ownReport = ownsReportAction(pathname);
   return (
     <nav
       aria-label="Navigation principale"
       className="glass-strong relative z-[var(--z-nav)] shrink-0 border-t border-line"
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
-      <ul className="mx-auto grid h-[var(--nav-height)] max-w-2xl grid-cols-5 items-stretch px-1">
+      <ul className={cn("mx-auto grid h-[var(--nav-height)] max-w-2xl items-stretch px-1", ownReport ? "grid-cols-4" : "grid-cols-5")}>
         <li>
           <NavItem entry={navigateEntry} active={isNavActive(navigateEntry, pathname)} layout="bottom" />
         </li>
         <li>
           <NavItem entry={map} active={isNavActive(map, pathname)} layout="bottom" />
         </li>
+        {!ownReport && (
         <li className="relative flex flex-col items-center justify-end pb-1.5">
           <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[22px]">
             <Fab to={REPORT_PATH} label={fr.nav.report} />
@@ -127,6 +140,7 @@ function BottomNav({ pathname, unread }: { pathname: string; unread: number }) {
             {fr.nav.report}
           </span>
         </li>
+        )}
         <li>
           <NavItem entry={explore} active={isNavActive(explore, pathname)} layout="bottom" />
         </li>
@@ -151,7 +165,7 @@ function SideNav({ pathname, unread }: { pathname: string; unread: number }) {
       className="glass-strong relative z-[var(--z-nav)] flex w-[var(--sidebar-width)] shrink-0 flex-col items-center border-r border-line"
       style={{ paddingTop: "calc(var(--safe-top) + 12px)", paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
     >
-      <Link to="/navigate" className="mb-4 inline-flex size-12 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40" aria-label={`${fr.appName} — ${fr.nav.map}`}>
+      <Link to="/home" className="mb-4 inline-flex size-12 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40" aria-label={`${fr.appName} — ${fr.nav.map}`}>
         <img src="/icons/icon.svg" alt="" width={40} height={40} className="size-10 rounded-lg" />
       </Link>
       <ul className="flex flex-col items-center gap-1">
