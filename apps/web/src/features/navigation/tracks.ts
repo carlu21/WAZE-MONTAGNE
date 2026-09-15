@@ -3,7 +3,7 @@
  * au serveur), export GPX, sauvegarde de la trace en cours pour survivre à un
  * rechargement de la page.
  */
-import { buildGpx, trackStats, type ActivityMode, type TrackPoint } from "@mountain-live/core";
+import { buildGpx, trackStats, type ActivityMode, type RawPoint, type TrackPoint } from "@mountain-live/core";
 import { fr } from "@mountain-live/core";
 import { db, type SavedTrack } from "@/lib/db";
 
@@ -14,8 +14,24 @@ export function trackName(activity: ActivityMode, date: Date = new Date()): stri
   return `${label} du ${date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })} à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-export async function saveTrack(input: { name: string; activity: ActivityMode; points: TrackPoint[] }): Promise<SavedTrack> {
-  const track: SavedTrack = { id: `trk_${Date.now().toString(36)}`, name: input.name, activity: input.activity, savedAt: Date.now(), points: input.points, stats: trackStats(input.points) };
+export async function saveTrack(input: {
+  name: string;
+  activity: ActivityMode;
+  points: TrackPoint[];
+  /** Trace brute, conservée telle quelle pour un envoi éventuel (section 5 du moteur collectif). */
+  raw?: readonly RawPoint[];
+  contributed?: boolean;
+}): Promise<SavedTrack> {
+  const track: SavedTrack = {
+    id: `trk_${Date.now().toString(36)}`,
+    name: input.name,
+    activity: input.activity,
+    savedAt: Date.now(),
+    points: input.points,
+    raw: input.raw ? [...input.raw] : undefined,
+    contributed: input.contributed ?? false,
+    stats: trackStats(input.points),
+  };
   await db.tracks.put(track);
   return track;
 }

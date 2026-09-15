@@ -143,6 +143,23 @@ export interface AdminUsersResponse {
  *  GET    /trails/:id                                        -> { trail: Trail }
  *  GET    /offline/bundle?bbox                               -> OfflineBundle (avec paths)
  *
+ *  Moteur cartographique collectif
+ *  POST   /activities                                        -> CreateActivityResponse (compte requis)
+ *  GET    /activities                                        -> ActivitiesResponse (les siennes uniquement)
+ *  GET    /activities/:id                                    -> { activity, points }
+ *  PATCH  /activities/:id                                    -> { activity } (consentement, nom)
+ *  DELETE /activities/:id                                    -> 204 (trace et passages effacés)
+ *  GET    /network/segments/:id                              -> SegmentDetail
+ *  GET    /network/heatmap?bbox&period&activity              -> HeatmapResponse
+ *  POST   /network/routes                                    -> RoutePlanResponse
+ *  GET    /network/overview?from&to                          -> NetworkOverview
+ *  GET    /network/candidates?kind&status                    -> NetworkCandidatesResponse
+ *  PATCH  /admin/network/candidates/:id                      -> { candidate } (modération)
+ *  POST   /admin/network/rebuild                             -> { processed, statistics, candidates }
+ *  GET    /users/me/privacy-zones                            -> { zones }
+ *  POST   /users/me/privacy-zones                            -> { zone }
+ *  DELETE /users/me/privacy-zones/:id                        -> 204
+ *
  * Communauté
  *  GET    /community/activity                                -> { reports: Report[]; topContributors: UserPublic[]; partners: UserPublic[] }
  *

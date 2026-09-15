@@ -9,7 +9,10 @@ import type { LatLng } from "../types";
 import type { LngLat } from "../geo";
 
 /** Activité en cours : adapte vitesse estimée, chemins praticables et seuils. */
-export type ActivityMode = "hiking" | "trail" | "mtb" | "equestrian";
+export type ActivityMode = "hiking" | "trail" | "mtb" | "equestrian" | "other";
+
+/** Toutes les activités, dans l'ordre d'affichage. */
+export const ACTIVITY_MODES: readonly ActivityMode[] = ["hiking", "trail", "mtb", "equestrian", "other"];
 
 /** Mode de suivi : compromis précision / batterie (section 2). */
 export type TrackingMode = "eco" | "normal" | "precise";

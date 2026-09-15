@@ -147,6 +147,10 @@ sequenceDiagram
 
 `packages/core/src/navigation` (moteur pur : graphe, map matching multi-hypothèses, progression, sortie d'itinéraire, instructions, événements devant soi, trace, GPX, ETA) → `apps/web/src/features/navigation` (sources de position GPS / simulation / externe, chargement du réseau par cellules avec cache IndexedDB, moteur temps réel monté une fois dans `App`, écran `/navigate`). Le réseau de chemins vient de la table `paths` (`GET /paths?bbox`, bundle hors connexion), alimentée par le réseau de démonstration et l'import OpenStreetMap. Détails : [NAVIGATION_GPS.md](NAVIGATION_GPS.md).
 
+### Moteur cartographique collectif
+
+`packages/core/src/network` (qualité des points, passages, statistiques, temps, routage multicritère, apprentissage, vie privée — modules purs) → `apps/api/src/services/activities.ts` (ingestion : trace brute conservée, masquage des abords privés, map matching différé, passages), `network-stats.ts` (agrégats incrémentaux) et `network-learning.ts` (candidatures soumises à modération) → `apps/web/src/features/network` (carte de fréquentation, fiche d'un chemin, planificateur d'itinéraires, tableau de bord, back-office). Détail : [MOTEUR_CARTOGRAPHIQUE.md](MOTEUR_CARTOGRAPHIQUE.md).
+
 ### Hors connexion
 
 Trois mécanismes complémentaires :

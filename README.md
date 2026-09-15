@@ -70,6 +70,16 @@ L'application s'ouvre sur **« Démarrer un itinéraire »**. Le module de navig
 
 Détails (algorithme, seuils, données, Bluetooth) : [docs/NAVIGATION_GPS.md](docs/NAVIGATION_GPS.md).
 
+## Le réseau vivant
+
+Les activités enregistrées, lorsque leur auteur choisit de contribuer, apprennent à l'application **comment la montagne est réellement parcourue** : fréquentation de chaque chemin, temps réellement observés par activité et par sens, tracés à corriger, chemins absents des cartes, ralentissements, demi-tours, intersections où l'on se trompe. De là viennent la carte de fréquentation, la fiche d'un chemin, et les itinéraires proposés entre deux points (le plus rapide, le plus court, le plus emprunté, le plus facile).
+
+Rien ne part sans un choix explicite, les traces sont pseudonymisées, les abords du départ et de l'arrivée sont écartés, et aucune statistique n'est publiée sous trois utilisateurs distincts. Détails : [docs/MOTEUR_CARTOGRAPHIQUE.md](docs/MOTEUR_CARTOGRAPHIQUE.md).
+
+```bash
+pnpm --filter @mountain-live/api db:seed-activities   # peuple la démonstration (36 contributeurs simulés, ≈ 280 sorties)
+```
+
 ## Ce que fait le MVP
 
 | Section du cahier des charges | Réalisé |

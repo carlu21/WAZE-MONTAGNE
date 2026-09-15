@@ -26,4 +26,12 @@ export const qk = {
   adminUsers: (p: Record<string, unknown>) => ["admin", "users", p] as const,
   pro: (p: Record<string, unknown>) => ["pro", p] as const,
   offlineZones: ["offlineZones"] as const,
+  activities: ["activities"] as const,
+  activity: (id: string) => ["activity", id] as const,
+  networkSegment: (id: string) => ["networkSegment", id] as const,
+  heatmap: (bbox: BBox, period: string, activity: string) =>
+    ["heatmap", [bbox.west, bbox.south, bbox.east, bbox.north].map((n) => n.toFixed(2)).join(","), period, activity] as const,
+  networkOverview: (p: Record<string, unknown>) => ["networkOverview", p] as const,
+  networkCandidates: (p: Record<string, unknown>) => ["networkCandidates", p] as const,
+  privacyZones: ["privacyZones"] as const,
 };

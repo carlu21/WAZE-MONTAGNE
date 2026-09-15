@@ -25,6 +25,9 @@ export function defaultPreferences(): UserPreferences {
     alerts: { enabled: true, radiusM: 1000, categories: [] },
     notifications: Object.fromEntries(ALL_NOTIFICATIONS.map((t) => [t, true])) as Record<NotificationType, boolean>,
     aroundRadiusM: 3000,
+    // Contribution collective : refusée tant que l'utilisateur ne l'a pas acceptée.
+    contributeTraces: false,
+    personalPace: true,
   };
 }
 

@@ -303,6 +303,212 @@ const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS paths_source_idx ON paths(source)`,
     ],
   },
+  {
+    version: 4,
+    name: "moteur cartographique collectif (activités, passages, statistiques, candidatures)",
+    statements: [
+      // --- Segments : métadonnées de graphe, profil et synthèse de fréquentation ---
+      `ALTER TABLE paths ADD COLUMN trail_id TEXT`,
+      `ALTER TABLE paths ADD COLUMN start_node TEXT`,
+      `ALTER TABLE paths ADD COLUMN end_node TEXT`,
+      `ALTER TABLE paths ADD COLUMN elevation_gain_m REAL`,
+      `ALTER TABLE paths ADD COLUMN elevation_loss_m REAL`,
+      `ALTER TABLE paths ADD COLUMN average_slope REAL`,
+      `ALTER TABLE paths ADD COLUMN max_slope REAL`,
+      `ALTER TABLE paths ADD COLUMN difficulty TEXT`,
+      `ALTER TABLE paths ADD COLUMN community_confidence REAL`,
+      `ALTER TABLE paths ADD COLUMN passage_count INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE paths ADD COLUMN last_passage_at TEXT`,
+      `ALTER TABLE paths ADD COLUMN popularity_score REAL NOT NULL DEFAULT 0`,
+      `ALTER TABLE paths ADD COLUMN version INTEGER NOT NULL DEFAULT 1`,
+      `CREATE INDEX IF NOT EXISTS paths_trail_idx ON paths(trail_id)`,
+      `CREATE INDEX IF NOT EXISTS paths_nodes_idx ON paths(start_node, end_node)`,
+
+      // --- Itinéraires : provenance et fiabilité ---
+      `ALTER TABLE trails ADD COLUMN source TEXT`,
+      `ALTER TABLE trails ADD COLUMN status TEXT`,
+      `ALTER TABLE trails ADD COLUMN confidence_score REAL`,
+
+      // --- Activités enregistrées (section 37 : ACTIVITIES) ---
+      `CREATE TABLE IF NOT EXISTS activities (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        name TEXT,
+        activity_type TEXT NOT NULL DEFAULT 'hiking',
+        source TEXT NOT NULL DEFAULT 'recorded',
+        started_at TEXT NOT NULL,
+        ended_at TEXT NOT NULL,
+        distance_m INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        moving_ms INTEGER NOT NULL DEFAULT 0,
+        elevation_gain_m INTEGER NOT NULL DEFAULT 0,
+        elevation_loss_m INTEGER NOT NULL DEFAULT 0,
+        max_alt_m INTEGER,
+        average_speed_ms REAL,
+        point_count INTEGER NOT NULL DEFAULT 0,
+        quality_score REAL,
+        matched_ratio REAL,
+        contribution TEXT NOT NULL DEFAULT 'private',
+        contributed_at TEXT,
+        processed_at TEXT,
+        raw_purged_at TEXT,
+        min_lat REAL,
+        min_lng REAL,
+        max_lat REAL,
+        max_lng REAL,
+        created_at TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS activities_user_idx ON activities(user_id, started_at)`,
+      `CREATE INDEX IF NOT EXISTS activities_contribution_idx ON activities(contribution, processed_at)`,
+
+      // --- Trace brute, jamais écrasée (section 5 et 8 : GPS_POINTS) ---
+      `CREATE TABLE IF NOT EXISTS activity_points (
+        activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        alt REAL,
+        accuracy REAL,
+        speed REAL,
+        heading REAL,
+        quality INTEGER,
+        PRIMARY KEY (activity_id, seq)
+      )`,
+
+      // --- Trace rattachée au réseau (section 8 : MATCHED_POINTS) ---
+      `CREATE TABLE IF NOT EXISTS activity_matched_points (
+        activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL,
+        segment_id TEXT,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        along REAL NOT NULL DEFAULT 0,
+        confidence REAL NOT NULL DEFAULT 0,
+        deviation_m REAL,
+        PRIMARY KEY (activity_id, seq)
+      )`,
+      `CREATE INDEX IF NOT EXISTS activity_matched_segment_idx ON activity_matched_points(segment_id)`,
+
+      // --- Passages (section 37 : SEGMENT_TRAVERSALS) ---
+      `CREATE TABLE IF NOT EXISTS segment_traversals (
+        id TEXT PRIMARY KEY,
+        segment_id TEXT NOT NULL,
+        activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+        user_key TEXT NOT NULL,
+        activity_type TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        entered_at INTEGER NOT NULL,
+        exited_at INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        distance_m REAL NOT NULL DEFAULT 0,
+        coverage REAL NOT NULL DEFAULT 1,
+        average_speed_ms REAL,
+        confidence REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS segment_traversals_segment_idx ON segment_traversals(segment_id, exited_at)`,
+      `CREATE INDEX IF NOT EXISTS segment_traversals_activity_idx ON segment_traversals(activity_id)`,
+      `CREATE INDEX IF NOT EXISTS segment_traversals_user_idx ON segment_traversals(user_key)`,
+
+      // --- Statistiques agrégées (section 37 : SEGMENT_STATISTICS) ---
+      `CREATE TABLE IF NOT EXISTS segment_statistics (
+        segment_id TEXT NOT NULL,
+        activity_type TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        passages_7 INTEGER NOT NULL DEFAULT 0,
+        passages_30 INTEGER NOT NULL DEFAULT 0,
+        passages_365 INTEGER NOT NULL DEFAULT 0,
+        passages_total INTEGER NOT NULL DEFAULT 0,
+        unique_users INTEGER NOT NULL DEFAULT 0,
+        unique_sessions INTEGER NOT NULL DEFAULT 0,
+        average_ms INTEGER,
+        median_ms INTEGER,
+        p25_ms INTEGER,
+        p75_ms INTEGER,
+        spread REAL,
+        average_speed_ms REAL,
+        first_passage_at INTEGER,
+        last_passage_at INTEGER,
+        popularity_score REAL NOT NULL DEFAULT 0,
+        frequentation TEXT NOT NULL DEFAULT 'unknown',
+        confidence REAL NOT NULL DEFAULT 0,
+        insufficient_data INTEGER NOT NULL DEFAULT 1,
+        activity_mix TEXT,
+        monthly TEXT,
+        hourly TEXT,
+        trend REAL,
+        possibly_inactive INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (segment_id, activity_type, direction)
+      )`,
+      `CREATE INDEX IF NOT EXISTS segment_statistics_popularity_idx ON segment_statistics(popularity_score)`,
+
+      // --- Candidatures issues de l'apprentissage (sections 17 à 21, 27 à 30, 46) ---
+      `CREATE TABLE IF NOT EXISTS network_candidates (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        segment_id TEXT,
+        geometry TEXT,
+        detail TEXT,
+        observations INTEGER NOT NULL DEFAULT 0,
+        unique_users INTEGER NOT NULL DEFAULT 0,
+        confidence REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'open',
+        first_seen_at INTEGER,
+        last_seen_at INTEGER,
+        min_lat REAL,
+        min_lng REAL,
+        max_lat REAL,
+        max_lng REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        reviewed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TEXT,
+        review_note TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS network_candidates_kind_idx ON network_candidates(kind, status)`,
+      `CREATE INDEX IF NOT EXISTS network_candidates_bbox_idx ON network_candidates(min_lat, min_lng)`,
+      `CREATE INDEX IF NOT EXISTS network_candidates_segment_idx ON network_candidates(segment_id)`,
+
+      // --- Versions de géométrie : rien n'est jamais écrasé (section 47) ---
+      `CREATE TABLE IF NOT EXISTS segment_versions (
+        id TEXT PRIMARY KEY,
+        segment_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        coordinates TEXT NOT NULL,
+        source TEXT NOT NULL,
+        reason TEXT,
+        confidence REAL,
+        author TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS segment_versions_unique ON segment_versions(segment_id, version)`,
+
+      // --- Allure personnelle, facultative (section 24) ---
+      `CREATE TABLE IF NOT EXISTS user_pace (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        activity_type TEXT NOT NULL,
+        factor REAL NOT NULL DEFAULT 1,
+        samples INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, activity_type)
+      )`,
+
+      // --- Zones privées déclarées par l'utilisateur (section 36) ---
+      `CREATE TABLE IF NOT EXISTS privacy_zones (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        label TEXT,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        radius_m INTEGER NOT NULL DEFAULT 250,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS privacy_zones_user_idx ON privacy_zones(user_id)`,
+    ],
+  },
 ];
 
 /** Applique toutes les migrations manquantes. Sans effet si la base est à jour. */

@@ -18,8 +18,11 @@ import type {
   UserPreferences,
   UserRole,
   AreaType,
+  ActivityMode,
+  ContributionStatus,
   PathKind,
   PathSource,
+  TraversalDirection,
 } from "@mountain-live/core";
 
 /**
@@ -244,6 +247,10 @@ export const trails = sqliteTable(
     maxLng: real("max_lng").notNull(),
     description: text("description"),
     createdAt: text("created_at").notNull(),
+    /** Provenance (osm, ign, seed, partner…) et état, migration 4. */
+    source: text("source"),
+    status: text("status").$type<"open" | "closed" | null>(),
+    confidenceScore: real("confidence_score"),
   },
   (t) => [index("trails_bbox_idx").on(t.minLat, t.minLng)],
 );
@@ -276,8 +283,32 @@ export const paths = sqliteTable(
     maxLat: real("max_lat").notNull(),
     maxLng: real("max_lng").notNull(),
     updatedAt: text("updated_at").notNull(),
+    // --- Moteur cartographique collectif (migration 4) ---
+    /** Itinéraire auquel ce segment appartient, si connu. */
+    trailId: text("trail_id"),
+    /** Clés des nœuds du graphe (extrémités) : dénormalisées pour le routage SQL. */
+    startNode: text("start_node"),
+    endNode: text("end_node"),
+    elevationGainM: real("elevation_gain_m"),
+    elevationLossM: real("elevation_loss_m"),
+    averageSlope: real("average_slope"),
+    maxSlope: real("max_slope"),
+    difficulty: text("difficulty").$type<"easy" | "moderate" | "hard" | "expert" | null>(),
+    /** Fiabilité de la géométrie au regard des passages observés (0..1). */
+    communityConfidence: real("community_confidence"),
+    /** Synthèse de fréquentation (détail dans segment_statistics). */
+    passageCount: integer("passage_count").notNull().default(0),
+    lastPassageAt: text("last_passage_at"),
+    popularityScore: real("popularity_score").notNull().default(0),
+    /** Version de géométrie courante (historique dans segment_versions). */
+    version: integer("version").notNull().default(1),
   },
-  (t) => [index("paths_bbox_idx").on(t.minLat, t.minLng), index("paths_source_idx").on(t.source)],
+  (t) => [
+    index("paths_bbox_idx").on(t.minLat, t.minLng),
+    index("paths_source_idx").on(t.source),
+    index("paths_trail_idx").on(t.trailId),
+    index("paths_nodes_idx").on(t.startNode, t.endNode),
+  ],
 );
 
 export const waterPoints = sqliteTable(
@@ -423,6 +454,252 @@ export const schemaMigrations = sqliteTable("schema_migrations", {
   appliedAt: text("applied_at").notNull(),
 });
 
+
+// ---------------------------------------------------------------------------
+// Moteur cartographique collectif (migration 4)
+//
+// Chaîne complète : activities → activity_points (trace brute, jamais écrasée)
+// → activity_matched_points (trace rattachée) → segment_traversals (passages)
+// → segment_statistics (agrégats publiables) → network_candidates
+// (apprentissage : géométries, chemins potentiels, comportements).
+// Aucune de ces tables ne sert à suivre une personne : les passages portent un
+// pseudonyme `user_key` dérivé d'un secret serveur, et les statistiques ne sont
+// publiées qu'au-delà d'un seuil d'utilisateurs distincts.
+// ---------------------------------------------------------------------------
+
+/** Activité enregistrée par un utilisateur (section 37 : ACTIVITIES). */
+export const activities = sqliteTable(
+  "activities",
+  {
+    id: text("id").primaryKey(),
+    /** Détaché (null) lorsque le compte est supprimé : la contribution reste anonyme. */
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: text("name"),
+    activityType: text("activity_type").$type<ActivityMode>().notNull(),
+    source: text("source").$type<"recorded" | "gpx">().notNull().default("recorded"),
+    startedAt: text("started_at").notNull(),
+    endedAt: text("ended_at").notNull(),
+    distanceM: integer("distance_m").notNull().default(0),
+    durationMs: integer("duration_ms").notNull().default(0),
+    movingMs: integer("moving_ms").notNull().default(0),
+    elevationGainM: integer("elevation_gain_m").notNull().default(0),
+    elevationLossM: integer("elevation_loss_m").notNull().default(0),
+    maxAltM: integer("max_alt_m"),
+    averageSpeedMs: real("average_speed_ms"),
+    pointCount: integer("point_count").notNull().default(0),
+    /** Qualité moyenne de la trace (0..5) et part de points rattachés (0..1). */
+    qualityScore: real("quality_score"),
+    matchedRatio: real("matched_ratio"),
+    /** Consentement de contribution collective (section 35). */
+    contribution: text("contribution").$type<ContributionStatus>().notNull().default("private"),
+    contributedAt: text("contributed_at"),
+    /** Date du traitement (matching + passages), null tant qu'il reste à faire. */
+    processedAt: text("processed_at"),
+    /** Date de purge de la trace brute (section 5 : conservation temporaire). */
+    rawPurgedAt: text("raw_purged_at"),
+    minLat: real("min_lat"),
+    minLng: real("min_lng"),
+    maxLat: real("max_lat"),
+    maxLng: real("max_lng"),
+    createdAt: text("created_at").notNull(),
+    deletedAt: text("deleted_at"),
+  },
+  (t) => [index("activities_user_idx").on(t.userId, t.startedAt), index("activities_contribution_idx").on(t.contribution, t.processedAt)],
+);
+
+/** Trace brute : positions réellement mesurées (section 5), jamais corrigées. */
+export const activityPoints = sqliteTable(
+  "activity_points",
+  {
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    /** Horodatage en millisecondes (epoch). */
+    at: integer("at").notNull(),
+    lat: real("lat").notNull(),
+    lng: real("lng").notNull(),
+    alt: real("alt"),
+    accuracy: real("accuracy"),
+    speed: real("speed"),
+    heading: real("heading"),
+    /** Score de qualité 0..5 calculé à l'ingestion (section 6). */
+    quality: integer("quality"),
+  },
+  (t) => [primaryKey({ columns: [t.activityId, t.seq] })],
+);
+
+/** Trace rattachée au réseau (section 8) : coexiste avec la trace brute. */
+export const activityMatchedPoints = sqliteTable(
+  "activity_matched_points",
+  {
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    segmentId: text("segment_id"),
+    lat: real("lat").notNull(),
+    lng: real("lng").notNull(),
+    along: real("along").notNull().default(0),
+    confidence: real("confidence").notNull().default(0),
+    deviationM: real("deviation_m"),
+  },
+  (t) => [primaryKey({ columns: [t.activityId, t.seq] }), index("activity_matched_segment_idx").on(t.segmentId)],
+);
+
+/** Passage d'un segment (section 37 : SEGMENT_TRAVERSALS). */
+export const segmentTraversals = sqliteTable(
+  "segment_traversals",
+  {
+    id: text("id").primaryKey(),
+    segmentId: text("segment_id").notNull(),
+    activityId: text("activity_id")
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    /** Pseudonyme stable, dérivé d'un secret serveur : jamais l'identifiant du compte. */
+    userKey: text("user_key").notNull(),
+    activityType: text("activity_type").$type<ActivityMode>().notNull(),
+    direction: text("direction").$type<TraversalDirection>().notNull(),
+    enteredAt: integer("entered_at").notNull(),
+    exitedAt: integer("exited_at").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    distanceM: real("distance_m").notNull().default(0),
+    coverage: real("coverage").notNull().default(1),
+    averageSpeedMs: real("average_speed_ms"),
+    confidence: real("confidence").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("segment_traversals_segment_idx").on(t.segmentId, t.exitedAt),
+    index("segment_traversals_activity_idx").on(t.activityId),
+    index("segment_traversals_user_idx").on(t.userKey),
+  ],
+);
+
+/** Statistiques publiables par segment, activité et sens (section 37). */
+export const segmentStatistics = sqliteTable(
+  "segment_statistics",
+  {
+    segmentId: text("segment_id").notNull(),
+    /** Activité, ou « all » pour l'agrégat. */
+    activityType: text("activity_type").notNull(),
+    /** Sens, ou « both » pour l'agrégat. */
+    direction: text("direction").notNull(),
+    passages7: integer("passages_7").notNull().default(0),
+    passages30: integer("passages_30").notNull().default(0),
+    passages365: integer("passages_365").notNull().default(0),
+    passagesTotal: integer("passages_total").notNull().default(0),
+    uniqueUsers: integer("unique_users").notNull().default(0),
+    uniqueSessions: integer("unique_sessions").notNull().default(0),
+    averageMs: integer("average_ms"),
+    medianMs: integer("median_ms"),
+    p25Ms: integer("p25_ms"),
+    p75Ms: integer("p75_ms"),
+    spread: real("spread"),
+    averageSpeedMs: real("average_speed_ms"),
+    firstPassageAt: integer("first_passage_at"),
+    lastPassageAt: integer("last_passage_at"),
+    popularityScore: real("popularity_score").notNull().default(0),
+    frequentation: text("frequentation").notNull().default("unknown"),
+    confidence: real("confidence").notNull().default(0),
+    insufficientData: integer("insufficient_data", { mode: "boolean" }).notNull().default(true),
+    activityMix: text("activity_mix", { mode: "json" }).$type<Record<string, number>>(),
+    monthly: text("monthly", { mode: "json" }).$type<Record<string, number>>(),
+    hourly: text("hourly", { mode: "json" }).$type<Record<string, number>>(),
+    trend: real("trend"),
+    possiblyInactive: integer("possibly_inactive", { mode: "boolean" }).notNull().default(false),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.segmentId, t.activityType, t.direction] }), index("segment_statistics_popularity_idx").on(t.popularityScore)],
+);
+
+/** Nature d'une candidature issue de l'apprentissage collectif. */
+export type CandidateKind = "new_trail" | "geometry" | "variant" | "slow_zone" | "turnaround" | "confusion" | "inactive";
+export type CandidateStatus = "open" | "accepted" | "rejected" | "merged";
+
+/** Proposition soumise à modération : jamais appliquée automatiquement (sections 17 à 21, 27 à 30, 46). */
+export const networkCandidates = sqliteTable(
+  "network_candidates",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").$type<CandidateKind>().notNull(),
+    segmentId: text("segment_id"),
+    geometry: text("geometry", { mode: "json" }).$type<[number, number][] | null>(),
+    detail: text("detail", { mode: "json" }).$type<Record<string, unknown>>(),
+    observations: integer("observations").notNull().default(0),
+    uniqueUsers: integer("unique_users").notNull().default(0),
+    confidence: real("confidence").notNull().default(0),
+    status: text("status").$type<CandidateStatus>().notNull().default("open"),
+    firstSeenAt: integer("first_seen_at"),
+    lastSeenAt: integer("last_seen_at"),
+    minLat: real("min_lat"),
+    minLng: real("min_lng"),
+    maxLat: real("max_lat"),
+    maxLng: real("max_lng"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    reviewedBy: text("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: text("reviewed_at"),
+    reviewNote: text("review_note"),
+  },
+  (t) => [
+    index("network_candidates_kind_idx").on(t.kind, t.status),
+    index("network_candidates_bbox_idx").on(t.minLat, t.minLng),
+    index("network_candidates_segment_idx").on(t.segmentId),
+  ],
+);
+
+/** Historique des géométries d'un segment (section 47 : rien n'est écrasé). */
+export const segmentVersions = sqliteTable(
+  "segment_versions",
+  {
+    id: text("id").primaryKey(),
+    segmentId: text("segment_id").notNull(),
+    version: integer("version").notNull(),
+    coordinates: text("coordinates", { mode: "json" }).$type<[number, number][]>().notNull(),
+    source: text("source").notNull(),
+    reason: text("reason"),
+    confidence: real("confidence"),
+    /** Compte d'origine, ou nom du traitement automatique. */
+    author: text("author"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("segment_versions_unique").on(t.segmentId, t.version)],
+);
+
+/** Allure personnelle observée, facultative (section 24). */
+export const userPace = sqliteTable(
+  "user_pace",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    activityType: text("activity_type").$type<ActivityMode>().notNull(),
+    /** Rapport au temps médian de la communauté (1 = allure médiane). */
+    factor: real("factor").notNull().default(1),
+    samples: integer("samples").notNull().default(0),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.activityType] })],
+);
+
+/** Zone dont les traces ne doivent jamais servir aux statistiques (section 36). */
+export const privacyZones = sqliteTable(
+  "privacy_zones",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label"),
+    lat: real("lat").notNull(),
+    lng: real("lng").notNull(),
+    radiusM: integer("radius_m").notNull().default(250),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("privacy_zones_user_idx").on(t.userId)],
+);
+
 // ---------------------------------------------------------------------------
 // Types de lignes
 // ---------------------------------------------------------------------------
@@ -435,6 +712,15 @@ export type PhotoRow = typeof photos.$inferSelect;
 export type OfficialAlertRow = typeof officialAlerts.$inferSelect;
 export type TrailRow = typeof trails.$inferSelect;
 export type PathRow = typeof paths.$inferSelect;
+export type ActivityRow = typeof activities.$inferSelect;
+export type ActivityPointRow = typeof activityPoints.$inferSelect;
+export type MatchedPointRow = typeof activityMatchedPoints.$inferSelect;
+export type TraversalRow = typeof segmentTraversals.$inferSelect;
+export type SegmentStatisticsRow = typeof segmentStatistics.$inferSelect;
+export type NetworkCandidateRow = typeof networkCandidates.$inferSelect;
+export type SegmentVersionRow = typeof segmentVersions.$inferSelect;
+export type UserPaceRow = typeof userPace.$inferSelect;
+export type PrivacyZoneRow = typeof privacyZones.$inferSelect;
 export type WaterPointRow = typeof waterPoints.$inferSelect;
 export type AreaRow = typeof areas.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;

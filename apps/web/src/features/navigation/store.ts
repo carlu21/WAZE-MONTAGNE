@@ -19,6 +19,7 @@ import type {
   NavRoute,
   RouteEvent,
   RouteProgress,
+  RawPoint,
   TrackPoint,
   TrackStats,
   TrackingMode,
@@ -96,6 +97,8 @@ interface NavigationState {
   live: NavLive;
   /** Trace finale (après « Terminer ») pour le résumé et l'export. */
   finalTrack: TrackPoint[] | null;
+  /** Trace brute correspondante : seule elle peut alimenter le réseau collectif. */
+  finalRaw: RawPoint[] | null;
   /** Demande de retour au parcours affichée après une sortie d'itinéraire. */
   offRoutePrompt: boolean;
   setActivity: (a: ActivityMode) => void;
@@ -105,7 +108,7 @@ interface NavigationState {
   start: (session: Omit<NavSession, "startedAt">) => void;
   pause: () => void;
   resume: () => void;
-  finish: (track: TrackPoint[]) => void;
+  finish: (track: TrackPoint[], raw?: readonly RawPoint[]) => void;
   reset: () => void;
   setLive: (patch: Partial<NavLive>) => void;
   setOffRoutePrompt: (v: boolean) => void;
@@ -124,16 +127,17 @@ export const useNavigationStore = create<NavigationState>()(
       session: null,
       live: EMPTY_LIVE,
       finalTrack: null,
+      finalRaw: null,
       offRoutePrompt: false,
       setActivity: (activity) => set({ activity }),
       setTrackingMode: (trackingMode) => set({ trackingMode }),
       setVoice: (voice) => set({ voice }),
       setFollow: (follow) => set({ follow }),
-      start: (session) => set({ status: "running", session: { ...session, startedAt: Date.now() }, live: EMPTY_LIVE, finalTrack: null, offRoutePrompt: false, follow: true }),
+      start: (session) => set({ status: "running", session: { ...session, startedAt: Date.now() }, live: EMPTY_LIVE, finalTrack: null, finalRaw: null, offRoutePrompt: false, follow: true }),
       pause: () => set({ status: get().status === "running" ? "paused" : get().status }),
       resume: () => set({ status: get().status === "paused" ? "running" : get().status }),
-      finish: (track) => set({ status: "finished", finalTrack: track, offRoutePrompt: false }),
-      reset: () => set({ status: "idle", session: null, live: EMPTY_LIVE, finalTrack: null, offRoutePrompt: false }),
+      finish: (track, raw) => set({ status: "finished", finalTrack: track, finalRaw: raw ? [...raw] : null, offRoutePrompt: false }),
+      reset: () => set({ status: "idle", session: null, live: EMPTY_LIVE, finalTrack: null, finalRaw: null, offRoutePrompt: false }),
       setLive: (patch) => set({ live: { ...get().live, ...patch } }),
       setOffRoutePrompt: (offRoutePrompt) => set({ offRoutePrompt }),
       switchRoute: (route, mode) => {

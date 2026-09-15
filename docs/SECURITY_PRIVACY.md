@@ -58,3 +58,15 @@ Encart `SafetyNotice` (fiche de signalement, page légale) : les informations co
 - Sauvegardes de la base et du dossier des photos ; journalisation sans données personnelles.
 - Passer les limites de débit et la présence en mémoire vers un stockage partagé (Redis) si plusieurs instances.
 - Revoir les conditions d'utilisation des tuiles (OpenTopoMap, Esri) pour le volume attendu, ou héberger ses propres tuiles.
+
+## Traces d'activité et réseau collectif
+
+La trace GPS est la donnée la plus sensible de l'application. Le moteur cartographique est construit en conséquence (sections 34 à 36 de son cahier des charges) :
+
+- **Rien sans consentement explicite.** L'enregistrement démarre sur « Démarrer », s'arrête sur « Terminer ». La contribution est demandée à la fin de chaque activité ; la préférence « toujours contribuer » est désactivée par défaut. Sans compte, aucune trace ne quitte l'appareil.
+- **Pseudonymisation.** Les passages portent une clé HMAC-SHA256 dérivée d'un secret serveur (`PSEUDONYM_SECRET`), jamais l'identifiant du compte. Elle sert uniquement à compter des utilisateurs distincts.
+- **Masquage des abords.** 250 m sont écartés au départ et à l'arrivée de chaque trace contribuée, en plus des zones privées déclarées. Une trace trop courte après masquage ne contribue pas du tout.
+- **k-anonymat.** Une statistique n'est publiée qu'à partir de trois utilisateurs distincts ; en dessous, durées, dates et comptages sont neutralisés.
+- **Réversibilité.** Retirer une contribution efface les passages ; supprimer une activité efface trace brute, trace rattachée et passages ; supprimer son compte détache les activités restantes.
+- **Conservation limitée.** Les traces brutes sont purgées après 90 jours (`RAW_TRACE_RETENTION_DAYS`). Les agrégats, eux, sont conservés : ils ne contiennent plus de données personnelles.
+- **Jamais de position individuelle publiée.** Les vues collectives affichent « 43 passages cette semaine », jamais qui est passé ni quand.

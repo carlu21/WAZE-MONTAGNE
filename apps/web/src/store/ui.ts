@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Basemap, ReportCategory, ReportSubtype } from "@mountain-live/core";
+import type { ActivityMode, Basemap, HeatmapPeriod, ReportCategory, ReportSubtype } from "@mountain-live/core";
 
 export interface MapViewState {
   lng: number;
@@ -26,6 +26,8 @@ interface UiState {
   position: { lat: number; lng: number; accuracy: number | null; at: number } | null;
   online: boolean;
   lastSyncAt: number | null;
+  /** Carte de fréquentation (section 12 du moteur cartographique). */
+  heatmap: { enabled: boolean; period: HeatmapPeriod; activity: ActivityMode | "all" };
   setFilters: (f: ReportCategory[]) => void;
   setExcludedSubtypes: (s: ReportSubtype[]) => void;
   setAutoCentered: (v: boolean) => void;
@@ -37,6 +39,7 @@ interface UiState {
   setPosition: (p: UiState["position"]) => void;
   setOnline: (v: boolean) => void;
   setLastSyncAt: (t: number | null) => void;
+  setHeatmap: (h: Partial<UiState["heatmap"]>) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -52,6 +55,7 @@ export const useUiStore = create<UiState>()(
       position: null,
       online: typeof navigator === "undefined" ? true : navigator.onLine,
       lastSyncAt: null,
+      heatmap: { enabled: false, period: "month", activity: "all" },
       setFilters: (filters) => set({ filters }),
       setExcludedSubtypes: (excludedSubtypes) => set({ excludedSubtypes }),
       setAutoCentered: (autoCentered) => set({ autoCentered }),
@@ -66,6 +70,7 @@ export const useUiStore = create<UiState>()(
       setPosition: (position) => set({ position }),
       setOnline: (online) => set({ online }),
       setLastSyncAt: (lastSyncAt) => set({ lastSyncAt }),
+      setHeatmap: (h) => set({ heatmap: { ...get().heatmap, ...h } }),
     }),
     {
       name: "ml.ui",
@@ -77,6 +82,7 @@ export const useUiStore = create<UiState>()(
         theme: s.theme,
         view: s.view,
         lastSyncAt: s.lastSyncAt,
+        heatmap: s.heatmap,
       }),
     },
   ),

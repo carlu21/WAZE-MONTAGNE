@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bike, ChevronDown, Compass, FileUp, Footprints, History, Mountain, Route, Search, Trash2 } from "lucide-react";
+import { Bike, ChevronDown, Compass, FileUp, Footprints, History, MapPinned, Mountain, Route, Search, Trash2 } from "lucide-react";
 import {
   bboxFromCenter,
   buildRoute,
@@ -32,6 +32,7 @@ import { qk } from "@/lib/queryKeys";
 import { db, type SavedTrack } from "@/lib/db";
 import { useUiStore } from "@/store/ui";
 import { deleteTrack, listTracks } from "./tracks";
+import { RoutePlanner } from "@/features/network/RoutePlanner";
 import { useNavigationStore, type NavMode } from "./store";
 
 /** Libellés courts (quatre segments sur un écran de 390 px) ; les icônes servent de libellé accessible. */
@@ -83,6 +84,7 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
   const [query, setQuery] = useState("");
   const [tracks, setTracks] = useState<SavedTrack[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -231,6 +233,9 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
       </section>
 
       <section className="flex flex-wrap gap-2">
+        <Button variant="secondary" leftIcon={<MapPinned />} onClick={() => setPlannerOpen(true)} data-testid="nav-open-planner">
+          Où allez-vous ?
+        </Button>
         <Button variant="secondary" leftIcon={<FileUp />} onClick={() => fileRef.current?.click()}>
           {fr.navigation.importGpx}
         </Button>
@@ -311,6 +316,8 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
       {!online ? <Banner tone="info" compact>{fr.navigation.setup.offlineHint}</Banner> : null}
 
       {/* Barre d'action fixe, au-dessus du bouton flottant « Signaler » de la coquille. */}
+      <RoutePlanner open={plannerOpen} onClose={() => setPlannerOpen(false)} activity={activity} onSelect={(r) => setRoute(r)} />
+
       <div className="fixed inset-x-0 z-[var(--z-overlay)] px-4" style={{ bottom: "calc(var(--shell-bottom) + 40px)", left: "var(--shell-left)" }}>
         <div className="mx-auto flex max-w-2xl gap-2">
           {route ? (

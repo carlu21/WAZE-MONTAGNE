@@ -23,6 +23,7 @@ import {
   type Maneuver,
   type NavContext,
   type NavState,
+  type RawPoint,
   type RouteEvent,
   type TrackPoint,
 } from "@mountain-live/core";
@@ -137,6 +138,7 @@ export function useNavigationEngine(): void {
       const step = navigationStep(navState.current, ctx, fix, Date.now());
       navState.current = step.state;
       engineTrack.current = step.state.track;
+      engineRaw.current = step.state.raw;
       const points = step.state.track.length;
       st.setLive({
         output: step.output,
@@ -243,6 +245,7 @@ export function useNavigationEngine(): void {
     if (sessionStartedAt === null) return;
     navState.current = createNavState();
     engineTrack.current = [];
+    engineRaw.current = [];
     maneuvers.current = [];
     routeEvents.current = [];
     data.current = null;
@@ -262,7 +265,7 @@ export function useNavigationEngine(): void {
   useEffect(() => {
     if (status !== "finished") return;
     const st = useNavigationStore.getState();
-    if (!st.finalTrack || st.finalTrack.length === 0) st.finish(navState.current.track);
+    if (!st.finalTrack || st.finalTrack.length === 0) st.finish(navState.current.track, navState.current.raw);
     void clearCurrentTrack();
   }, [status]);
 }
@@ -276,6 +279,8 @@ function getLoader(): NetworkLoader {
 
 /** Trace en cours, lue sans re-rendu (« Terminer », « Revenir sur mes pas »). */
 const engineTrack = { current: [] as TrackPoint[] };
+/** Trace brute correspondante (section 5 du moteur cartographique) : jamais corrigée. */
+const engineRaw = { current: [] as RawPoint[] };
 
 /** GeoJSON des segments chargés (couche « réseau » de la carte de navigation). */
 export function networkGraphSnapshot(): { type: "FeatureCollection"; features: { type: "Feature"; geometry: { type: "LineString"; coordinates: [number, number][] }; properties: { id: string; kind: string; name: string | null } }[] } {
@@ -289,4 +294,9 @@ export function networkGraphSnapshot(): { type: "FeatureCollection"; features: {
 
 export function currentTrack(): TrackPoint[] {
   return engineTrack.current;
+}
+
+/** Trace brute de l'activité en cours (envoyée telle quelle si l'utilisateur contribue). */
+export function currentRawTrace(): RawPoint[] {
+  return engineRaw.current;
 }

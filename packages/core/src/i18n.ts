@@ -467,7 +467,7 @@ export const fr = {
     myTracks: "Mes traces",
     noTracks: "Aucune trace enregistrée pour l'instant.",
     activity: "Activité",
-    activities: { hiking: "Randonnée", trail: "Trail", mtb: "VTT", equestrian: "Équitation" },
+    activities: { hiking: "Randonnée", trail: "Trail", mtb: "VTT", equestrian: "Équitation", other: "Autre" },
     trackingMode: "Précision du suivi",
     trackingModes: { eco: "Économie de batterie", normal: "Normal", precise: "Précision élevée" },
     trackingHints: {
@@ -575,6 +575,158 @@ export const fr = {
       modeRouteHint: "Guidage pas à pas, distance restante, événements devant vous.",
       needLocation: "Activez la localisation pour démarrer.",
       offlineHint: "Le GPS fonctionne sans réseau : téléchargez la zone avant de partir pour garder la carte et les sentiers.",
+    },
+  },
+
+  /**
+   * Moteur cartographique collectif : fréquentation, temps observés,
+   * itinéraires, contribution et vie privée.
+   */
+  network: {
+    title: "Le réseau vivant",
+    subtitle: "Ce que les passages nous apprennent des chemins",
+
+    /** Contribution et consentement (section 35). */
+    contribute: {
+      title: "Contribuer à l'amélioration des chemins",
+      short: "Contribuer anonymement",
+      hint: "Vos traces servent à corriger les tracés, mesurer les temps réels et découvrir des chemins absents des cartes. Elles sont anonymisées : aucune position personnelle n'est publiée.",
+      ask: "Contribuer anonymement avec cette activité à améliorer les informations du réseau ?",
+      accept: "Contribuer",
+      decline: "Garder pour moi",
+      contributed: "Activité partagée anonymement. Merci.",
+      kept: "Activité conservée pour vous seul.",
+      withdraw: "Retirer ma contribution",
+      withdrawn: "Contribution retirée : cette activité ne compte plus dans les statistiques.",
+      always: "Toujours contribuer, sans me redemander",
+      privacyNote: "Les départs et arrivées sont écartés avant toute utilisation collective, et une statistique n'est publiée qu'à partir de plusieurs utilisateurs distincts.",
+    },
+
+    /** Mes activités (sections 35 et 49). */
+    activities: {
+      title: "Mes activités",
+      empty: "Aucune activité enregistrée pour l'instant.",
+      emptyHint: "Démarrez un itinéraire : distance, durée, dénivelé et trace seront enregistrés sur cet appareil.",
+      delete: "Supprimer cette activité",
+      deleteConfirm: "Supprimer définitivement cette activité ?",
+      deleteBody: "La trace et les passages correspondants seront effacés, y compris des statistiques collectives.",
+      deleteAll: "Supprimer tout mon historique",
+      deleted: "Activité supprimée.",
+      status: { private: "Privée", contributed: "Partagée anonymement", withdrawn: "Contribution retirée" },
+      processed: "Rattachée au réseau",
+      pending: "En attente de traitement",
+      segments: "{n} segments parcourus",
+    },
+
+    /** Fiche d'un chemin (section 33). */
+    segment: {
+      title: "Chemin",
+      length: "Longueur",
+      elevation: "Dénivelé",
+      difficulty: "Difficulté",
+      surface: "Surface",
+      state: "État",
+      lastPassage: "Dernier passage",
+      passages: "Fréquentation",
+      times: "Temps observés",
+      noTimes: "Pas encore de temps observé sur ce chemin.",
+      reports: "Signalements",
+      routes: "Voir les itinéraires utilisant ce chemin",
+      openStatus: { open: "Praticable", closed: "Fermé" },
+      basedOn: "Basé sur {n} passages",
+      basedOnOne: "Basé sur 1 passage",
+      slowZone: "Ralentissement observé",
+      turnaround: "Demi-tours fréquents",
+      confusion: "Intersection où l'on se trompe souvent",
+    },
+
+    /** Fréquentation (sections 11, 12, 43). */
+    frequentation: {
+      title: "Fréquentation",
+      levels: {
+        unknown: "Données insuffisantes",
+        very_low: "Très faible",
+        low: "Faible",
+        moderate: "Modérée",
+        high: "Élevée",
+        very_high: "Très élevée",
+      },
+      insufficient: "Données communautaires insuffisantes",
+      insufficientHint: "Peu de passages enregistrés ici : cela ne veut pas dire que le chemin n'existe pas ou qu'il est mauvais.",
+      periods: { today: "Aujourd'hui", week: "7 jours", month: "30 jours", year: "Cette année", all: "Tout" },
+      passages: "{n} passages",
+      passagesOne: "1 passage",
+      recent: "{n} passages ces 30 derniers jours",
+      season: "Fréquentation habituelle élevée à cette période.",
+      declining: "Fréquentation en forte baisse.",
+      legend: "Plus le trait est vif, plus le chemin est emprunté.",
+    },
+
+    /** Itinéraires proposés (sections 22, 23). */
+    routes: {
+      title: "Itinéraires",
+      from: "Départ",
+      to: "Arrivée",
+      useMyPosition: "Ma position",
+      search: "Chercher un itinéraire",
+      searching: "Recherche d'itinéraires…",
+      none: "Aucun itinéraire trouvé entre ces deux points sur le réseau connu.",
+      noneHint: "Essayez des points plus proches d'un chemin, ou élargissez la zone téléchargée.",
+      criteria: {
+        fastest: "Le plus rapide",
+        shortest: "Le plus court",
+        most_used: "Le plus emprunté",
+        easiest: "Le plus facile",
+        quietest: "Le moins fréquenté",
+        recommended: "Recommandé",
+      },
+      observed: "Temps observé",
+      theoretical: "Temps estimé",
+      choose: "Suivre cet itinéraire",
+    },
+
+    /** Confiance des estimations (section 26). */
+    confidence: {
+      label: "Confiance",
+      levels: { very_low: "Très faible", low: "Faible", medium: "Moyenne", high: "Élevée", very_high: "Très élevée" },
+      theoretical: "Estimation théorique, sans passage observé.",
+      blended: "Estimation affinée par les passages observés.",
+      observed: "Estimation fondée sur les passages observés.",
+      personal: "Temps estimé pour vous",
+      community: "Temps moyen observé",
+    },
+
+    /** Zones privées (section 36). */
+    privacy: {
+      title: "Zones privées",
+      hint: "Les traces situées dans ces zones ne servent jamais aux statistiques collectives. Le départ et l'arrivée de chaque activité sont de toute façon écartés.",
+      add: "Ajouter une zone",
+      suggestion: "Un départ revient souvent ici : en faire une zone privée ?",
+      remove: "Retirer cette zone",
+      radius: "Rayon",
+      label: "Nom (facultatif)",
+      empty: "Aucune zone privée déclarée.",
+    },
+
+    /** Candidatures issues de l'apprentissage (sections 19, 46). */
+    candidates: {
+      title: "Propositions du terrain",
+      kinds: {
+        new_trail: "Chemin potentiel",
+        geometry: "Tracé à corriger",
+        variant: "Variante empruntée",
+        slow_zone: "Zone de ralentissement",
+        turnaround: "Demi-tours fréquents",
+        confusion: "Intersection confuse",
+        inactive: "Chemin peut-être abandonné",
+      },
+      status: { open: "À examiner", accepted: "Acceptée", rejected: "Rejetée", merged: "Fusionnée" },
+      observations: "{observations} passages · {users} utilisateurs distincts",
+      accept: "Valider",
+      reject: "Rejeter",
+      note: "Note de décision",
+      empty: "Aucune proposition en attente.",
+      hint: "Rien n'est appliqué automatiquement : chaque proposition attend une décision humaine.",
     },
   },
 

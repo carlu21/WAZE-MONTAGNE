@@ -36,6 +36,9 @@ export const LAYER_IDS = {
   navAccuracy: "ml-nav-accuracy",
   navMarkerHalo: "ml-nav-marker-halo",
   navMarker: "ml-nav-marker",
+  /** Carte de fréquentation (réseau vivant). */
+  heatPathsCasing: "ml-heat-paths-casing",
+  heatPaths: "ml-heat-paths",
 } as const;
 
 export const SOURCE_IDS = {
@@ -52,11 +55,14 @@ export const SOURCE_IDS = {
   navReturn: "ml-nav-return",
   navEvents: "ml-nav-events",
   navUser: "ml-nav-user",
+  heatPaths: "ml-heat-paths",
 } as const;
 
 /** Du plus bas (dessous) au plus haut (dessus). */
 export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.presenceHeat,
+  LAYER_IDS.heatPathsCasing,
+  LAYER_IDS.heatPaths,
   LAYER_IDS.navPathsCasing,
   LAYER_IDS.navPaths,
   LAYER_IDS.alertsFill,

@@ -29,6 +29,8 @@ const AdminPage = lazy(() => import("./pages/AdminPage"));
 const ProDashboardPage = lazy(() => import("./pages/ProDashboardPage"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const NavigationPage = lazy(() => import("./pages/NavigationPage"));
+const ActivitiesPage = lazy(() => import("./pages/ActivitiesPage"));
+const PrivacyZonesPage = lazy(() => import("./pages/PrivacyZonesPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function S({ children }: { children: React.ReactNode }) {
@@ -58,6 +60,8 @@ export const router = createBrowserRouter([
       { path: "/profile", element: <S><RequireAuth><ProfilePage /></RequireAuth></S> },
       { path: "/profile/preferences", element: <S><RequireAuth><PreferencesPage /></RequireAuth></S> },
       { path: "/profile/settings", element: <S><RequireAuth><SettingsPage /></RequireAuth></S> },
+      { path: "/profile/activities", element: <S><ActivitiesPage /></S> },
+      { path: "/profile/privacy-zones", element: <S><RequireAuth><PrivacyZonesPage /></RequireAuth></S> },
       { path: "/notifications", element: <S><RequireAuth><NotificationsPage /></RequireAuth></S> },
       { path: "/offline", element: <S><OfflinePage /></S> },
     ],

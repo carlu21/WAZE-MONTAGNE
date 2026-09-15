@@ -11,6 +11,8 @@ import { config } from "./config";
 import { runMigrations } from "./db/migrate";
 import { sqlite } from "./db/client";
 import type { AppEnv } from "./middleware/auth";
+import { activitiesRoutes } from "./routes/activities";
+import { adminNetworkRoutes } from "./routes/admin-network";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { communityRoutes } from "./routes/community";
@@ -18,7 +20,9 @@ import { exploreRoutes } from "./routes/explore";
 import { flagsRoutes } from "./routes/flags";
 import { notificationsRoutes } from "./routes/notifications";
 import { offlineRoutes } from "./routes/offline";
+import { networkRoutes } from "./routes/network";
 import { presenceRoutes } from "./routes/presence";
+import { privacyZonesRoutes } from "./routes/privacy-zones";
 import { proRoutes } from "./routes/pro";
 import { reportsRoutes } from "./routes/reports";
 import { usersRoutes } from "./routes/users";
@@ -79,7 +83,11 @@ export function createApp() {
   api.get("/taxonomy", (c) => c.json({ categories: CATEGORIES, subtypes: SUBTYPES }));
 
   api.route("/auth", authRoutes);
+  // Monté avant /users : la route imbriquée doit primer sur /users/:id.
+  api.route("/users/me/privacy-zones", privacyZonesRoutes);
   api.route("/users", usersRoutes);
+  api.route("/activities", activitiesRoutes);
+  api.route("/network", networkRoutes);
   api.route("/reports", reportsRoutes);
   api.route("/flags", flagsRoutes);
   api.route("/", exploreRoutes);
@@ -87,6 +95,7 @@ export function createApp() {
   api.route("/notifications", notificationsRoutes);
   api.route("/offline", offlineRoutes);
   api.route("/community", communityRoutes);
+  api.route("/admin/network", adminNetworkRoutes);
   api.route("/admin", adminRoutes);
   api.route("/pro", proRoutes);
 

@@ -260,6 +260,15 @@ export interface UserPreferences {
   notifications: Record<NotificationType, boolean>;
   /** Rayon par défaut de la vue « Autour de moi » (mètres). */
   aroundRadiusM: number;
+  /**
+   * Contribution anonyme des traces à l'amélioration du réseau (section 35 du
+   * moteur cartographique). Désactivée par défaut : rien ne part sans un choix
+   * explicite. Chaque activité peut de toute façon être contribuée ou retirée
+   * individuellement.
+   */
+  contributeTraces: boolean;
+  /** Estimations de durée ajustées à l'allure observée de l'utilisateur (section 24). */
+  personalPace: boolean;
 }
 
 export interface UserMe extends UserPublic {

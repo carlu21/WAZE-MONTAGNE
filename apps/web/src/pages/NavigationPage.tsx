@@ -31,7 +31,7 @@ import { NavSetup } from "@/features/navigation/NavSetup";
 import { NavSummary } from "@/features/navigation/NavSummary";
 import { requestCompassPermission, useCompass } from "@/features/navigation/compass";
 import { useNavigationStore, type NavMode } from "@/features/navigation/store";
-import { currentTrack } from "@/features/navigation/useNavigationEngine";
+import { currentRawTrace, currentTrack } from "@/features/navigation/useNavigationEngine";
 import { stopSpeaking } from "@/features/navigation/speech";
 
 const FOLLOW_ZOOM = 15.5;
@@ -46,6 +46,7 @@ export default function NavigationPage() {
   const setFollow = useNavigationStore((s) => s.setFollow);
   const offRoutePrompt = useNavigationStore((s) => s.offRoutePrompt);
   const finalTrack = useNavigationStore((s) => s.finalTrack);
+  const finalRaw = useNavigationStore((s) => s.finalRaw);
   const mapRef = useRef<MaplibreMap | null>(null);
   const [stopConfirm, setStopConfirm] = useState(false);
   const [returnTarget, setReturnTarget] = useState<LatLng | null>(null);
@@ -180,7 +181,7 @@ export default function NavigationPage() {
   };
   const onStop = () => {
     const st = useNavigationStore.getState();
-    st.finish(currentTrack());
+    st.finish(currentTrack(), currentRawTrace());
     stopSpeaking();
     // Les alertes de l'activité n'ont plus lieu d'être (et ne doivent pas recouvrir le résumé).
     toast.clear();
@@ -198,7 +199,7 @@ export default function NavigationPage() {
     return (
       <div className="flex h-full min-h-0 flex-col bg-bg">
         <main className="min-h-0 flex-1 overflow-y-auto">
-          {status === "finished" ? <NavSummary track={finalTrack ?? []} onDone={onDone} /> : <NavSetup presetRoute={presetRoute} presetMode={presetMode} presetSimulate={presetSimulate} onStart={(i) => void start(i)} />}
+          {status === "finished" ? <NavSummary track={finalTrack ?? []} raw={finalRaw ?? []} onDone={onDone} /> : <NavSetup presetRoute={presetRoute} presetMode={presetMode} presetSimulate={presetSimulate} onStart={(i) => void start(i)} />}
         </main>
       </div>
     );

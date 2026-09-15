@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Info, List, Navigation2 } from "lucide-react";
+import { Activity, Info, List, Navigation2 } from "lucide-react";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { fr, inBBox, phrases, type Area, type BBox, type OfficialAlert, type Report } from "@mountain-live/core";
 import { IconButton } from "@/components/ui";
@@ -32,6 +32,10 @@ import { MapLegend } from "@/features/map/MapLegend";
 import { filterByZoom } from "@/features/map/geojson";
 import { AREA_TYPE_ZOOM } from "@/features/map/areas";
 import { pushRecentSearch } from "@/features/map/recentSearches";
+import { HeatmapLayer } from "@/features/network/HeatmapLayer";
+import { HeatmapControls } from "@/features/network/HeatmapControls";
+import { SegmentSheet } from "@/features/network/SegmentSheet";
+import { useHeatmap } from "@/features/network/useHeatmap";
 import type { MapNavigationState } from "@/pages/ReportWizardPage";
 
 /** Zoom appliqué au premier centrage sur la position de l'utilisateur. */
@@ -61,7 +65,13 @@ export default function MapPage() {
   const [searchArea, setSearchArea] = useState<Area | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [activeUsers, setActiveUsers] = useState(0);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const firstLocateDone = useRef(false);
+
+  // Réseau vivant : fréquentation réelle des chemins (section 12).
+  const heatmapSettings = useUiStore((s) => s.heatmap);
+  const setHeatmap = useUiStore((s) => s.setHeatmap);
+  const heat = useHeatmap(viewBBox, zoom);
 
   const geolocation = useGeolocation();
   const { data, reports, officialAlerts, isLoading, isFetching } = useReports(viewBBox, zoom);
@@ -200,6 +210,7 @@ export default function MapPage() {
         <PresenceLayer bbox={viewBBox} onEstimate={setActiveUsers} />
         <OfficialAlertsLayer alerts={officialAlerts} selectedId={selectedAlertId} onSelect={selectAlert} />
         <ReportsLayer reports={reports} zoom={zoom} selectedId={selectedReportId} onSelect={selectReport} />
+        {heatmapSettings.enabled ? <HeatmapLayer data={heat.data} onSelect={setSelectedSegmentId} /> : null}
         <UserLocation />
         <SearchMarker area={searchArea} onClick={(a) => navigate(`/explore/${a.id}`)} />
         {/* Dans le contexte de la carte : le bouton « Me localiser » peut la recentrer. */}
@@ -239,11 +250,30 @@ export default function MapPage() {
       </div>
 
       {/* Navigation GPS sur les sentiers (écran plein écran) */}
-      <div className="absolute right-3 z-[var(--z-overlay)]" style={{ bottom: "calc(var(--safe-bottom) + 72px)" }}>
+      <div className="absolute right-3 z-[var(--z-overlay)] flex flex-col gap-2" style={{ bottom: "calc(var(--safe-bottom) + 72px)" }}>
+        <IconButton
+          aria-label={fr.network.title}
+          title={fr.network.title}
+          variant="glass"
+          size={52}
+          shape="round"
+          pressed={heatmapSettings.enabled}
+          onClick={() => setHeatmap({ enabled: !heatmapSettings.enabled })}
+          data-testid="map-heatmap"
+        >
+          <Activity className={heatmapSettings.enabled ? "text-accent" : undefined} />
+        </IconButton>
         <IconButton aria-label={fr.navigation.title} title={fr.navigation.title} variant="glass" size={52} shape="round" onClick={() => navigate("/navigate")} data-testid="map-navigate">
           <Navigation2 className="text-primary" />
         </IconButton>
       </div>
+
+      {/* Réglages de la fréquentation */}
+      {heatmapSettings.enabled ? (
+        <div className="pointer-events-none absolute left-3 z-[var(--z-overlay)]" style={{ bottom: "calc(var(--safe-bottom) + 72px)" }}>
+          <HeatmapControls data={heat.data} loading={heat.isLoading} zoomedOut={heat.zoomedOut} onClose={() => setHeatmap({ enabled: false })} />
+        </div>
+      ) : null}
 
       {/* Légende repliable (icônes, couleurs, ancienneté) */}
       <div className="absolute right-3 z-[var(--z-overlay)]" style={{ bottom: "calc(var(--safe-bottom) + 16px)" }}>
@@ -267,6 +297,7 @@ export default function MapPage() {
 
       <SearchSheet open={sheet === "search"} onClose={() => setSheet("none")} onSelect={onSelectArea} />
       <FilterSheet open={sheet === "filters"} onClose={() => setSheet("none")} />
+      <SegmentSheet segmentId={selectedSegmentId} onClose={() => setSelectedSegmentId(null)} />
       <ReportPreviewSheet report={selectedReport} onClose={() => setSelectedReportId(null)} />
       <AlertPreviewSheet alert={selectedAlert} onClose={() => setSelectedAlertId(null)} />
     </div>

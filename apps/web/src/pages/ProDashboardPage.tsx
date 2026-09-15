@@ -12,6 +12,7 @@ import { Banner, Button, EmptyState, IconButton, Input, ListItem, Segmented, Sta
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { BarChart, LineChart } from "@/features/admin/charts";
+import { NetworkOverviewPanel } from "@/features/network/NetworkOverviewPanel";
 import { downloadTextFile, toCsv } from "@/features/admin/csv";
 import { MiniMap } from "@/features/explore/MiniMap";
 
@@ -170,6 +171,11 @@ export default function ProDashboardPage() {
             <p className="text-muted">{fr.common.loading}</p>
           ) : null}
         </div>
+            <section className="mx-auto w-full max-w-3xl px-4 pb-10">
+          <h2 className="mb-2 text-[18px] font-bold text-fg">{fr.network.title}</h2>
+          <p className="mb-3 text-[14px] text-muted">{fr.network.subtitle}</p>
+          <NetworkOverviewPanel from={params.from} to={params.to} />
+        </section>
       </main>
     </div>
   );

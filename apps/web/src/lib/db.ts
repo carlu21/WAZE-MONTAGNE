@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { BBox, Report, OfficialAlert, Trail, WaterPoint, Area, CreateReportInput, PathSegment, TrackPoint, TrackStats } from "@mountain-live/core";
+import type { ActivityMode, BBox, Report, OfficialAlert, Trail, WaterPoint, Area, CreateReportInput, PathSegment, RawPoint, TrackPoint, TrackStats } from "@mountain-live/core";
 
 /**
  * Base locale (IndexedDB) pour le mode hors connexion (section 9).
@@ -40,10 +40,16 @@ export interface PathCell {
 export interface SavedTrack {
   id: string;
   name: string;
-  activity: "hiking" | "trail" | "mtb" | "equestrian";
+  activity: ActivityMode;
   savedAt: number;
   points: TrackPoint[];
+  /** Trace brute (jamais corrigée) conservée pour un envoi ultérieur au serveur. */
+  raw?: RawPoint[];
   stats: TrackStats;
+  /** Activité déjà envoyée au serveur : identifiant distant. */
+  remoteId?: string;
+  /** Consentement de contribution enregistré pour cette trace. */
+  contributed?: boolean;
 }
 
 export type OutboxItem =

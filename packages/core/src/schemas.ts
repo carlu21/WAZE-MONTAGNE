@@ -91,6 +91,8 @@ export const preferencesSchema = z.object({
   }),
   notifications: z.record(notificationTypeSchema, z.boolean()),
   aroundRadiusM: z.number().int().min(500).max(10000),
+  contributeTraces: z.boolean().default(false),
+  personalPace: z.boolean().default(true),
 });
 export type PreferencesInput = z.infer<typeof preferencesSchema>;
 
@@ -222,3 +224,84 @@ export const officialAlertSchema = z.object({
     .optional(),
 });
 export type OfficialAlertInput = z.infer<typeof officialAlertSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Moteur cartographique collectif                                      */
+/* ------------------------------------------------------------------ */
+
+export const activityModeSchema = z.enum(["hiking", "trail", "mtb", "equestrian", "other"]);
+
+/**
+ * Point brut d'une trace. `at` est en millisecondes : les traces sont
+ * échantillonnées à la seconde, une date ISO par point serait dix fois plus
+ * lourde pour aucun gain.
+ */
+export const activityPointSchema = z.object({
+  at: z.number().int().min(0),
+  lat: latSchema,
+  lng: lngSchema,
+  alt: z.number().min(-500).max(9000).nullable().optional(),
+  accuracy: z.number().min(0).max(10000).nullable().optional(),
+  speed: z.number().min(0).max(200).nullable().optional(),
+  heading: z.number().min(0).max(360).nullable().optional(),
+});
+export type ActivityPointInputSchema = z.infer<typeof activityPointSchema>;
+
+/** Envoi d'une activité terminée (trace brute complète). */
+export const createActivitySchema = z.object({
+  activityType: activityModeSchema,
+  source: z.enum(["recorded", "gpx"]).default("recorded"),
+  name: z.string().max(120).nullable().optional(),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime(),
+  /** Consentement explicite pour cette activité (section 35). */
+  contribute: z.boolean().default(false),
+  /** Identifiant local : rejouer un envoi ne crée pas de doublon. */
+  clientId: z.string().min(1).max(64).nullable().optional(),
+  points: z.array(activityPointSchema).min(2).max(50_000),
+});
+export type CreateActivityInput = z.infer<typeof createActivitySchema>;
+
+/** Modification du consentement d'une activité déjà envoyée. */
+export const updateActivitySchema = z.object({
+  name: z.string().max(120).nullable().optional(),
+  contribute: z.boolean().optional(),
+});
+export type UpdateActivityInput = z.infer<typeof updateActivitySchema>;
+
+export const heatmapPeriodSchema = z.enum(["today", "week", "month", "year", "all"]);
+
+export const heatmapQuerySchema = z.object({
+  bbox: bboxStringSchema,
+  period: heatmapPeriodSchema.default("month"),
+  activity: z.union([activityModeSchema, z.literal("all")]).default("all"),
+});
+
+export const routeCriterionSchema = z.enum(["fastest", "shortest", "most_used", "easiest", "quietest", "recommended"]);
+
+export const routePlanSchema = z.object({
+  from: z.object({ lat: latSchema, lng: lngSchema }),
+  to: z.object({ lat: latSchema, lng: lngSchema }),
+  activity: activityModeSchema.default("hiking"),
+  criteria: z.array(routeCriterionSchema).min(1).max(6).optional(),
+});
+export type RoutePlanInput = z.infer<typeof routePlanSchema>;
+
+export const candidateKindSchema = z.enum(["new_trail", "geometry", "variant", "slow_zone", "turnaround", "confusion", "inactive"]);
+
+export const candidateReviewSchema = z.object({
+  status: z.enum(["accepted", "rejected", "merged"]),
+  note: z.string().max(500).nullable().optional(),
+  /** Pour une correction de tracé acceptée : appliquer la géométrie proposée. */
+  applyGeometry: z.boolean().default(false),
+});
+export type CandidateReviewInput = z.infer<typeof candidateReviewSchema>;
+
+/** Zone privée déclarée par l'utilisateur (section 36). */
+export const privacyZoneSchema = z.object({
+  label: z.string().max(60).nullable().optional(),
+  lat: latSchema,
+  lng: lngSchema,
+  radiusM: z.number().int().min(100).max(2000).default(250),
+});
+export type PrivacyZoneInput = z.infer<typeof privacyZoneSchema>;

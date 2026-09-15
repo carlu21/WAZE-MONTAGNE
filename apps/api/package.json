@@ -14,7 +14,8 @@
     "db:reset": "rm -f data/mountain-live.db data/mountain-live.db-wal data/mountain-live.db-shm && tsx src/db/migrate.ts && tsx src/db/seed.ts",
     "test:watch": "vitest",
     "geo:import": "tsx src/db/import-geonames.ts",
-    "geo:import-osm": "tsx src/db/import-osm.ts"
+    "geo:import-osm": "tsx src/db/import-osm.ts",
+    "db:seed-activities": "tsx src/db/seed-activities-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",

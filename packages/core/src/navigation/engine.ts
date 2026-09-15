@@ -13,6 +13,7 @@ import { createMatchState, matchFix, type MatchOutput, type MatchState } from ".
 import { createOffRouteState, offRouteThresholdM, projectOnRoute, updateOffRoute, type OffRouteState, type RouteProgress } from "./route";
 import { acceptTrackPoint, toTrackPoint } from "./track";
 import type { ActivityMode, GpsFix, NavRoute, TrackPoint } from "./types";
+import type { RawPoint } from "../network/types";
 
 export interface NavContext {
   graph: PathGraph;
@@ -39,7 +40,17 @@ export interface NavState {
   offRoute: OffRouteState;
   /** Palier annoncé par événement. */
   announced: Map<string, number>;
+  /**
+   * Trace d'affichage (fil d'Ariane) : position retenue, donc rattachée au
+   * chemin quand la confiance est bonne.
+   */
   track: TrackPoint[];
+  /**
+   * Trace BRUTE : tout relevé reçu, jamais corrigé (section 5 du moteur
+   * cartographique). C'est elle qui est envoyée au serveur si l'utilisateur
+   * contribue, et elle ne doit jamais être écrasée par la trace corrigée.
+   */
+  raw: RawPoint[];
   /** Vitesse moyenne lissée en mouvement (m/s). */
   movingSpeedMs: number | null;
   lastInstructionKey: string | null;
@@ -75,6 +86,7 @@ export function createNavState(): NavState {
     offRoute: createOffRouteState(),
     announced: new Map(),
     track: [],
+    raw: [],
     movingSpeedMs: null,
     lastInstructionKey: null,
     arrived: false,
@@ -94,7 +106,13 @@ export function navigationStep(state: NavState, ctx: NavContext, fix: GpsFix, no
     movingSpeedMs = movingSpeedMs === null ? output.speedMs : movingSpeedMs + SPEED_EMA * (output.speedMs - movingSpeedMs);
   }
 
-  // Trace : position affichée (rattachée au chemin quand la confiance est bonne).
+  // Trace brute : tout relevé est conservé tel quel, sans filtrage ni correction.
+  const raw: RawPoint[] = [
+    ...state.raw,
+    { lat: fix.lat, lng: fix.lng, alt: fix.altitude, at: fix.at, accuracy: fix.accuracy, speed: fix.speed, heading: fix.heading },
+  ];
+
+  // Trace d'affichage : position retenue (rattachée au chemin quand la confiance est bonne).
   const last = state.track[state.track.length - 1] ?? null;
   const trackPointAdded = acceptTrackPoint(last, fix);
   const track = trackPointAdded ? [...state.track, toTrackPoint(fix, output.matched && output.confidence >= 0.5 ? output.position : output.raw)] : state.track;
@@ -150,6 +168,7 @@ export function navigationStep(state: NavState, ctx: NavContext, fix: GpsFix, no
     offRoute,
     announced,
     track,
+    raw,
     movingSpeedMs,
     lastInstructionKey: announceInstruction && instruction ? instruction.key : state.lastInstructionKey,
     arrived,

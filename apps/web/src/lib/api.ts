@@ -30,6 +30,23 @@ import {
   type NetworkStats,
   type WaterPoint,
   type PathSegment,
+  type ActivitiesResponse,
+  type ActivityDto,
+  type CreateActivityInput,
+  type CreateActivityResponse,
+  type HeatmapPeriod,
+  type HeatmapResponse,
+  type NetworkCandidatesResponse,
+  type NetworkCandidateDto,
+  type NetworkOverview,
+  type PrivacyZoneInput,
+  type RoutePlanInput,
+  type RoutePlanResponse,
+  type SegmentDetail,
+  type UpdateActivityInput,
+  type ActivityMode,
+  type ActivityPointInput,
+  type CandidateReviewInput,
   type RegisterInput,
   type LoginInput,
   type UpdateMeInput,
@@ -186,6 +203,33 @@ export const api = {
   offline: {
     bundle: (bbox: BBox) => request<OfflineBundle>("GET", `/offline/bundle${q({ bbox: bboxParam(bbox) })}`),
   },
+  /** Moteur cartographique collectif : activités, réseau, itinéraires. */
+  activities: {
+    create: (input: CreateActivityInput) => request<CreateActivityResponse>("POST", "/activities", input),
+    list: (p: { limit?: number; offset?: number } = {}) => request<ActivitiesResponse>("GET", `/activities${q(p)}`),
+    get: (id: string) => request<{ activity: ActivityDto; points: ActivityPointInput[] }>("GET", `/activities/${id}`),
+    update: (id: string, input: UpdateActivityInput) => request<{ activity: ActivityDto }>("PATCH", `/activities/${id}`, input),
+    remove: (id: string) => request<void>("DELETE", `/activities/${id}`),
+  },
+  network: {
+    segment: (id: string) => request<SegmentDetail>("GET", `/network/segments/${encodeURIComponent(id)}`),
+    heatmap: (p: { bbox: BBox; period?: HeatmapPeriod; activity?: ActivityMode | "all" }) =>
+      request<HeatmapResponse>("GET", `/network/heatmap${q({ bbox: bboxParam(p.bbox), period: p.period, activity: p.activity })}`),
+    routes: (input: RoutePlanInput) => request<RoutePlanResponse>("POST", "/network/routes", input),
+    overview: (p: { from?: string; to?: string } = {}) => request<NetworkOverview>("GET", `/network/overview${q(p)}`),
+    candidates: (p: { kind?: string; status?: string; limit?: number } = {}) =>
+      request<NetworkCandidatesResponse>("GET", `/network/candidates${q(p)}`),
+    reviewCandidate: (id: string, input: CandidateReviewInput) =>
+      request<{ candidate: NetworkCandidateDto }>("PATCH", `/admin/network/candidates/${id}`, input),
+    rebuild: () => request<{ processed: number; statistics: number; candidates: number }>("POST", "/admin/network/rebuild"),
+  },
+  privacyZones: {
+    list: () => request<{ zones: { id: string; label: string | null; lat: number; lng: number; radiusM: number }[] }>("GET", "/users/me/privacy-zones"),
+    create: (input: PrivacyZoneInput) =>
+      request<{ zone: { id: string; label: string | null; lat: number; lng: number; radiusM: number } }>("POST", "/users/me/privacy-zones", input),
+    remove: (id: string) => request<void>("DELETE", `/users/me/privacy-zones/${id}`),
+  },
+
   community: {
     activity: () =>
       request<{ reports: Report[]; topContributors: UserPublic[]; partners: UserPublic[] }>(

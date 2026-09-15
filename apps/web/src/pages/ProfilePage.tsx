@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Bell, Download, LogOut, Pencil, Settings, ShieldCheck, SlidersHorizontal, LayoutDashboard, Users } from "lucide-react";
+import { Bell, Download, LogOut, Pencil, Settings, ShieldCheck, SlidersHorizontal, LayoutDashboard, Users, Route } from "lucide-react";
 import { BADGES, PRACTICES, fr, type BadgeId, type Practice } from "@mountain-live/core";
 import { Avatar, BadgeIcon, Button, CategoryIcon, Chip, Field, Input, ListItem, Modal, ReliabilityLevel, Stat, TopBar } from "@/components/ui";
 import { useSessionStore } from "@/store/session";
@@ -116,6 +116,7 @@ export default function ProfilePage() {
           <nav aria-label="Réglages" className="overflow-hidden rounded-xl border border-line bg-surface">
             <ListItem icon={<SlidersHorizontal />} title={fr.profilePage.preferences} subtitle="Filtres, fond de carte, thème, alertes, notifications" to="/profile/preferences" chevron divider />
             <ListItem icon={<Bell />} title={fr.notifications.title} to="/notifications" chevron divider />
+            <ListItem icon={<Route />} title={fr.network.activities.title} subtitle="Historique, contribution au réseau, zones privées" to="/profile/activities" chevron divider />
             <ListItem icon={<Users />} title={fr.nav.community} to="/community" chevron divider />
             <ListItem icon={<Download />} title={fr.offline.zonesTitle} subtitle={fr.offline.download} to="/offline" chevron divider />
             <ListItem icon={<Settings />} title={fr.profilePage.settings} subtitle="Compte, confidentialité, données" to="/profile/settings" chevron divider={isModerator || isPro} />

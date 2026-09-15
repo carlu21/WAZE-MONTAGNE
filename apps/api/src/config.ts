@@ -50,6 +50,16 @@ export const config = {
   presenceBucketMin: 5,
   /** Durée de rétention des signalements expirés / supprimés avant purge (jours). */
   expiredRetentionDays: 90,
+  /**
+   * Secret de pseudonymisation des contributions (moteur cartographique).
+   * Dérivé du secret de jetons s'il n'est pas fourni. Le changer réinitialise
+   * le comptage d'utilisateurs distincts : à ne faire qu'en connaissance de cause.
+   */
+  pseudonymSecret: process.env.PSEUDONYM_SECRET ?? `pseudonyme:${resolveJwtSecret()}`,
+  /** Conservation des traces brutes avant purge (jours) : section 5 du moteur collectif. */
+  rawTraceRetentionDays: intEnv("RAW_TRACE_RETENTION_DAYS", 90),
+  /** Nombre maximal de points acceptés pour une activité envoyée. */
+  maxActivityPoints: intEnv("MAX_ACTIVITY_POINTS", 50_000),
   /** Taille maximale d'une photo (octets) : 5 Mo. */
   maxPhotoBytes: 5 * 1024 * 1024,
   /** Rayon de floutage des espèces sensibles (mètres). */

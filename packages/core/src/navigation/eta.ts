@@ -11,6 +11,7 @@ export const DEFAULT_SPEED_MS: Record<ActivityMode, number> = {
   trail: 8000 / 3600,
   mtb: 12000 / 3600,
   equestrian: 6000 / 3600,
+  other: 4000 / 3600,
 };
 
 /** Temps (ms) ajouté par mètre de dénivelé positif (Naismith : 1 h / 600 m à pied). */
@@ -19,6 +20,7 @@ export const CLIMB_MS_PER_M: Record<ActivityMode, number> = {
   trail: 3600_000 / 1000,
   mtb: 3600_000 / 800,
   equestrian: 3600_000 / 700,
+  other: 3600_000 / 600,
 };
 
 export interface EtaInput {

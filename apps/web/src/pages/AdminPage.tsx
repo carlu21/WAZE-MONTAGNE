@@ -30,6 +30,7 @@ import { qk } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
 import { BarChart } from "@/features/admin/charts";
 import { GeometryPicker, type AlertGeometry } from "@/features/admin/GeometryPicker";
+import { NetworkTab } from "@/features/admin/NetworkTab";
 
 const TABS = [
   { to: "", label: "Tableau de bord", end: true },
@@ -37,6 +38,7 @@ const TABS = [
   { to: "flags", label: fr.moderation.admin.flags },
   { to: "users", label: fr.moderation.admin.users },
   { to: "alerts", label: fr.moderation.admin.alerts },
+  { to: "network", label: fr.network.candidates.title },
 ];
 const PAGE_SIZE = 20;
 const STATUSES = Object.keys(STATUS_LABELS) as ReportStatus[];
@@ -75,6 +77,7 @@ export default function AdminPage() {
             <Route path="flags" element={<FlagsTab />} />
             <Route path="users" element={<UsersTab />} />
             <Route path="alerts" element={<AlertsTab />} />
+            <Route path="network" element={<NetworkTab />} />
             <Route path="*" element={<Navigate to="" replace />} />
           </Routes>
         </div>

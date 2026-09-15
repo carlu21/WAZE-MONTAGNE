@@ -47,9 +47,13 @@ export function normalizeFixTime(deviceAt: number, receivedAt: number): number {
   return deviceAt;
 }
 
+function numberOrNull(v: number | null | undefined): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
 export function fixFromGeolocation(pos: GeolocationPosition, receivedAt: number = Date.now()): GpsFix {
   const c = pos.coords;
-  const num = (v: number | null | undefined): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const num = numberOrNull;
   return {
     lat: c.latitude,
     lng: c.longitude,
@@ -78,6 +82,46 @@ export interface GeolocationSourceDeps {
 
 /** Période de la veille (ms) : vérifie que les relevés continuent d'arriver. */
 export const WATCHDOG_TICK_MS = 5_000;
+
+/** Immobilité : en dessous de cette vitesse, inutile de multiplier les points. */
+export const STILL_SPEED_MS = 0.4;
+/** Changement de cap (degrés) à partir duquel un relevé est retenu sans attendre. */
+export const TURN_HEADING_DEG = 25;
+/** Variation de vitesse (m/s) à partir de laquelle un relevé est retenu sans attendre. */
+export const SPEED_CHANGE_MS = 1.5;
+/** Multiplicateur d'intervalle à l'arrêt, et plafond correspondant (ms). */
+export const STILL_INTERVAL_FACTOR = 3;
+export const STILL_INTERVAL_MAX_MS = 30_000;
+
+/**
+ * Cadence adaptative (section 3 du moteur cartographique) : conserver assez de
+ * points pour reconstruire fidèlement le trajet, sans vider la batterie.
+ *
+ * - virage marqué ou changement de vitesse net : le relevé passe tout de suite
+ *   (c'est exactement là que la géométrie a besoin de détail) ;
+ * - immobilité : l'intervalle est allongé (rien à apprendre d'un arrêt) ;
+ * - sinon : la cadence du mode de suivi.
+ */
+export function shouldEmitFix(
+  baseIntervalMs: number,
+  sinceLastEmitMs: number,
+  previous: { heading: number | null; speed: number | null } | null,
+  fix: { heading: number | null; speed: number | null },
+): boolean {
+  if (sinceLastEmitMs <= 0) return true;
+  const moving = (fix.speed ?? 0) >= STILL_SPEED_MS || (previous?.speed ?? 0) >= STILL_SPEED_MS;
+  if (moving && previous) {
+    const turned =
+      previous.heading !== null &&
+      fix.heading !== null &&
+      Math.abs(((fix.heading - previous.heading + 540) % 360) - 180) >= TURN_HEADING_DEG;
+    const accelerated = previous.speed !== null && fix.speed !== null && Math.abs(fix.speed - previous.speed) >= SPEED_CHANGE_MS;
+    // Un virage ou une rupture de rythme méritent un point, mais jamais plus d'un par seconde.
+    if ((turned || accelerated) && sinceLastEmitMs >= 1_000) return true;
+  }
+  const interval = moving ? baseIntervalMs : Math.min(STILL_INTERVAL_MAX_MS, baseIntervalMs * STILL_INTERVAL_FACTOR);
+  return sinceLastEmitMs >= interval * 0.8;
+}
 /** Délai minimal entre deux relances de l'écoute (ms). */
 export const RESTART_COOLDOWN_MS = 8_000;
 
@@ -127,6 +171,7 @@ export class GeolocationSource implements PositionSource {
   private lastEmitAt = 0;
   private lastRestartAt = 0;
   private lastFixTime = 0;
+  private lastEmitted: { heading: number | null; speed: number | null } | null = null;
   private failures = 0;
   private status: SourceStatus = "searching";
   private readonly geolocation: GeolocationLike | null;
@@ -161,10 +206,12 @@ export class GeolocationSource implements PositionSource {
     const receivedAt = this.now();
     this.lastReceivedAt = receivedAt;
     this.failures = 0;
-    // Cadence mesurée sur l'heure de réception : un relevé en cache ou daté à
-    // l'identique ne doit jamais interrompre le flux.
-    if (this.lastEmitAt > 0 && receivedAt - this.lastEmitAt < this.profile.intervalMs * 0.8) return;
+    // Cadence ADAPTATIVE, mesurée sur l'heure de réception : un relevé en cache
+    // ou daté à l'identique ne doit jamais interrompre le flux.
+    const candidate = { heading: numberOrNull(pos.coords.heading), speed: numberOrNull(pos.coords.speed) };
+    if (this.lastEmitAt > 0 && !shouldEmitFix(this.profile.intervalMs, receivedAt - this.lastEmitAt, this.lastEmitted, candidate)) return;
     this.lastEmitAt = receivedAt;
+    this.lastEmitted = candidate;
     this.setStatus("live");
     const fix = fixFromGeolocation(pos, receivedAt);
     // L'horodatage doit progresser : un récepteur qui répète la même valeur
@@ -222,6 +269,7 @@ export class GeolocationSource implements PositionSource {
     if (now - this.lastRestartAt < minGapMs) return;
     this.lastRestartAt = now;
     this.lastEmitAt = 0;
+    this.lastEmitted = null;
     this.openWatch();
     this.kick();
   }
@@ -252,6 +300,7 @@ export class GeolocationSource implements PositionSource {
     }
     this.lastReceivedAt = this.now();
     this.lastEmitAt = 0;
+    this.lastEmitted = null;
     this.lastRestartAt = this.now();
     this.lastFixTime = 0;
     this.failures = 0;
