@@ -499,6 +499,8 @@ export const fr = {
     gpsWeak: "Signal GPS faible",
     gpsWeakBody: "Position estimée à partir de votre trajectoire et des sentiers.",
     gpsLost: "Signal GPS perdu",
+    gpsSearching: "Recherche du signal GPS…",
+    gpsBack: "Signal GPS retrouvé.",
     gpsWaiting: "Recherche du signal GPS…",
     gpsDenied: "Localisation refusée : la navigation a besoin du GPS.",
     accuracy: "Précision ±{distance}",

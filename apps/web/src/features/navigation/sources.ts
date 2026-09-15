@@ -12,13 +12,42 @@ import { TRACKING_PROFILES, offsetPoint, pointAtAlong, type GpsFix, type NavRout
 
 export type PositionSourceKind = "gps" | "simulation" | "external";
 
+/** État de la source, indépendant de la qualité du dernier relevé. */
+export type SourceStatus = "searching" | "live";
+
+export type PositionErrorCode = "denied" | "unavailable" | "timeout";
+
 export interface PositionSource {
   readonly kind: PositionSourceKind;
-  start(onFix: (fix: GpsFix) => void, onError: (message: string, code?: "denied" | "unavailable" | "timeout") => void): void;
+  start(
+    onFix: (fix: GpsFix) => void,
+    onError: (message: string, code?: PositionErrorCode) => void,
+    onStatus?: (status: SourceStatus) => void,
+  ): void;
   stop(): void;
 }
 
-export function fixFromGeolocation(pos: GeolocationPosition): GpsFix {
+/** Écart maximal toléré entre l'horodatage du récepteur et l'heure de réception (ms). */
+export const FIX_MAX_SKEW_MS = 10_000;
+
+/**
+ * Horodatage retenu pour un relevé.
+ *
+ * `GeolocationPosition.timestamp` n'est pas fiable partout : certains
+ * navigateurs le comptent depuis le démarrage de l'appareil, d'autres
+ * renvoient une position en cache dont l'horodatage ne bouge plus. Un
+ * horodatage invraisemblable (dans le futur, ou vieux de plus de dix
+ * secondes) ferait croire à un signal perdu en permanence : on retient alors
+ * l'heure de réception.
+ */
+export function normalizeFixTime(deviceAt: number, receivedAt: number): number {
+  if (!Number.isFinite(deviceAt) || deviceAt <= 0) return receivedAt;
+  const age = receivedAt - deviceAt;
+  if (age < -2_000 || age > FIX_MAX_SKEW_MS) return receivedAt;
+  return deviceAt;
+}
+
+export function fixFromGeolocation(pos: GeolocationPosition, receivedAt: number = Date.now()): GpsFix {
   const c = pos.coords;
   const num = (v: number | null | undefined): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
@@ -29,44 +58,223 @@ export function fixFromGeolocation(pos: GeolocationPosition): GpsFix {
     altitudeAccuracy: num(c.altitudeAccuracy),
     heading: num(c.heading),
     speed: num(c.speed),
-    at: Number.isFinite(pos.timestamp) ? pos.timestamp : Date.now(),
+    at: normalizeFixTime(pos.timestamp, receivedAt),
   };
 }
 
-/** GPS/GNSS du téléphone : `watchPosition` haute précision, cadence selon le mode de suivi. */
+/** API de géolocalisation utilisée (injectable pour les tests). */
+export interface GeolocationLike {
+  watchPosition(success: PositionCallback, error?: PositionErrorCallback | null, options?: PositionOptions): number;
+  clearWatch(id: number): void;
+  getCurrentPosition(success: PositionCallback, error?: PositionErrorCallback | null, options?: PositionOptions): void;
+}
+
+export interface GeolocationSourceDeps {
+  geolocation?: GeolocationLike | null;
+  now?: () => number;
+  /** Abonnement au retour au premier plan (onglet / écran rallumé). */
+  onVisible?: (fn: () => void) => () => void;
+}
+
+/** Période de la veille (ms) : vérifie que les relevés continuent d'arriver. */
+export const WATCHDOG_TICK_MS = 5_000;
+/** Délai minimal entre deux relances de l'écoute (ms). */
+export const RESTART_COOLDOWN_MS = 8_000;
+
+function defaultOnVisible(fn: () => void): () => void {
+  if (typeof document === "undefined") return () => {};
+  const handler = () => {
+    if (!document.hidden) fn();
+  };
+  document.addEventListener("visibilitychange", handler);
+  window.addEventListener("focus", handler);
+  return () => {
+    document.removeEventListener("visibilitychange", handler);
+    window.removeEventListener("focus", handler);
+  };
+}
+
+/**
+ * GPS/GNSS du téléphone (source principale, section 2).
+ *
+ * `watchPosition` s'arrête silencieusement dans plusieurs situations
+ * courantes : mise en arrière-plan de l'onglet, écran verrouillé, perte de
+ * signal prolongée, passage en tunnel. Cette source ne se contente donc pas
+ * d'écouter :
+ *
+ * - une **veille** vérifie toutes les 5 s que des relevés arrivent encore et
+ *   relance l'écoute (nouvelle `watchPosition` + demande immédiate) après un
+ *   silence supérieur à `staleAfterMs` ;
+ * - un **délai dépassé** ou une position indisponible relancent l'écoute au
+ *   lieu d'abandonner ; l'utilisateur n'est prévenu qu'après plusieurs échecs ;
+ * - le **retour au premier plan** relance immédiatement ;
+ * - la cadence est mesurée sur l'heure de **réception** (un récepteur qui
+ *   renvoie le même horodatage ne doit pas faire taire la source).
+ *
+ * Seul un refus d'autorisation est définitif.
+ */
 export class GeolocationSource implements PositionSource {
   readonly kind = "gps" as const;
   private watchId: number | null = null;
-  private lastAt = 0;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  private unsubscribeVisible: (() => void) | null = null;
+  private onFix: ((fix: GpsFix) => void) | null = null;
+  private onError: ((message: string, code?: PositionErrorCode) => void) | null = null;
+  private onStatus: ((status: SourceStatus) => void) | null = null;
+  /** Heure de réception du dernier relevé reçu (même ignoré par la cadence). */
+  private lastReceivedAt = 0;
+  /** Heure de réception du dernier relevé transmis au moteur. */
+  private lastEmitAt = 0;
+  private lastRestartAt = 0;
+  private lastFixTime = 0;
+  private failures = 0;
+  private status: SourceStatus = "searching";
+  private readonly geolocation: GeolocationLike | null;
+  private readonly now: () => number;
+  private readonly onVisible: (fn: () => void) => () => void;
 
-  constructor(private readonly mode: TrackingMode) {}
+  constructor(
+    private readonly mode: TrackingMode,
+    deps: GeolocationSourceDeps = {},
+  ) {
+    this.geolocation = deps.geolocation ?? (typeof navigator !== "undefined" && "geolocation" in navigator ? navigator.geolocation : null);
+    this.now = deps.now ?? (() => Date.now());
+    this.onVisible = deps.onVisible ?? defaultOnVisible;
+  }
 
-  start(onFix: (fix: GpsFix) => void, onError: (message: string, code?: "denied" | "unavailable" | "timeout") => void): void {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+  private get profile() {
+    return TRACKING_PROFILES[this.mode];
+  }
+
+  private setStatus(status: SourceStatus): void {
+    if (this.status === status) return;
+    this.status = status;
+    this.onStatus?.(status);
+  }
+
+  private options(): PositionOptions {
+    const p = this.profile;
+    return { enableHighAccuracy: p.highAccuracy, maximumAge: p.maximumAgeMs, timeout: Math.max(20_000, p.staleAfterMs) };
+  }
+
+  private handlePosition = (pos: GeolocationPosition): void => {
+    const receivedAt = this.now();
+    this.lastReceivedAt = receivedAt;
+    this.failures = 0;
+    // Cadence mesurée sur l'heure de réception : un relevé en cache ou daté à
+    // l'identique ne doit jamais interrompre le flux.
+    if (this.lastEmitAt > 0 && receivedAt - this.lastEmitAt < this.profile.intervalMs * 0.8) return;
+    this.lastEmitAt = receivedAt;
+    this.setStatus("live");
+    const fix = fixFromGeolocation(pos, receivedAt);
+    // L'horodatage doit progresser : un récepteur qui répète la même valeur
+    // figerait l'âge du relevé (signal déclaré perdu) et les calculs de vitesse.
+    if (fix.at <= this.lastFixTime) fix.at = receivedAt;
+    this.lastFixTime = fix.at;
+    this.onFix?.(fix);
+  };
+
+  private handleError = (err: GeolocationPositionError): void => {
+    if (err.code === err.PERMISSION_DENIED) {
+      const report = this.onError;
+      this.stop();
+      report?.("Localisation refusée.", "denied");
+      return;
+    }
+    this.failures += 1;
+    this.setStatus("searching");
+    // Délai dépassé ou position indisponible : on relance, c'est le cas normal
+    // en forêt, en canyon ou après un passage en arrière-plan.
+    this.restart(1_000);
+    if (this.failures === 3) {
+      this.onError?.(
+        err.code === err.TIMEOUT ? "Position GPS introuvable pour l'instant : recherche en cours." : "Position indisponible : recherche en cours.",
+        err.code === err.TIMEOUT ? "timeout" : "unavailable",
+      );
+    }
+  };
+
+  /** Demande ponctuelle : première position rapide, et relance après un silence. */
+  private kick(): void {
+    this.geolocation?.getCurrentPosition(this.handlePosition, () => {
+      /* l'écoute continue : l'échec ponctuel est sans conséquence */
+    }, this.options());
+  }
+
+  private openWatch(): void {
+    if (!this.geolocation) return;
+    this.closeWatch();
+    this.watchId = this.geolocation.watchPosition(this.handlePosition, this.handleError, this.options());
+  }
+
+  private closeWatch(): void {
+    if (this.watchId !== null) this.geolocation?.clearWatch(this.watchId);
+    this.watchId = null;
+  }
+
+  /**
+   * Relance l'écoute, au plus une fois par `minGapMs`. Après une relance, le
+   * prochain relevé est transmis sans attendre la cadence : la carte doit
+   * retrouver la position immédiatement.
+   */
+  private restart(minGapMs: number = RESTART_COOLDOWN_MS): void {
+    const now = this.now();
+    if (now - this.lastRestartAt < minGapMs) return;
+    this.lastRestartAt = now;
+    this.lastEmitAt = 0;
+    this.openWatch();
+    this.kick();
+  }
+
+  private tick = (): void => {
+    if (this.watchId === null && this.geolocation) {
+      this.restart(0);
+      return;
+    }
+    const silent = this.now() - this.lastReceivedAt;
+    if (silent > this.profile.staleAfterMs) {
+      this.setStatus("searching");
+      this.restart();
+    }
+  };
+
+  start(
+    onFix: (fix: GpsFix) => void,
+    onError: (message: string, code?: PositionErrorCode) => void,
+    onStatus?: (status: SourceStatus) => void,
+  ): void {
+    this.onFix = onFix;
+    this.onError = onError;
+    this.onStatus = onStatus ?? null;
+    if (!this.geolocation) {
       onError("Géolocalisation indisponible sur cet appareil.", "unavailable");
       return;
     }
-    const profile = TRACKING_PROFILES[this.mode];
-    this.watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const fix = fixFromGeolocation(pos);
-        // En mode économie / normal, les relevés trop rapprochés sont ignorés (batterie, calculs).
-        if (fix.at - this.lastAt < profile.intervalMs * 0.8 && this.lastAt > 0) return;
-        this.lastAt = fix.at;
-        onFix(fix);
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) onError("Localisation refusée.", "denied");
-        else if (err.code === err.TIMEOUT) onError("Position GPS introuvable pour l'instant.", "timeout");
-        else onError("Position indisponible.", "unavailable");
-      },
-      { enableHighAccuracy: profile.highAccuracy, maximumAge: profile.maximumAgeMs, timeout: 30_000 },
-    );
+    this.lastReceivedAt = this.now();
+    this.lastEmitAt = 0;
+    this.lastRestartAt = this.now();
+    this.lastFixTime = 0;
+    this.failures = 0;
+    this.status = "searching";
+    this.openWatch();
+    this.kick();
+    this.watchdog = setInterval(this.tick, WATCHDOG_TICK_MS);
+    // Retour au premier plan : les minuteurs et l'écoute ont pu être suspendus.
+    this.unsubscribeVisible = this.onVisible(() => {
+      this.lastReceivedAt = this.now();
+      this.restart(0);
+    });
   }
 
   stop(): void {
-    if (this.watchId !== null && typeof navigator !== "undefined" && "geolocation" in navigator) navigator.geolocation.clearWatch(this.watchId);
-    this.watchId = null;
+    this.closeWatch();
+    if (this.watchdog !== null) clearInterval(this.watchdog);
+    this.watchdog = null;
+    this.unsubscribeVisible?.();
+    this.unsubscribeVisible = null;
+    this.onFix = null;
+    this.onError = null;
+    this.onStatus = null;
   }
 }
 

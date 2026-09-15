@@ -28,7 +28,7 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
   const activity = useNavigationStore((s) => s.activity);
   const follow = useNavigationStore((s) => s.follow);
   const session = useNavigationStore((s) => s.session);
-  const { output, progress, instruction, nextEvent, quality, stats, movingSpeedMs, offRoute, arrived } = live;
+  const { output, progress, instruction, nextEvent, quality, stats, movingSpeedMs, offRoute, arrived, searching } = live;
 
   const Icon = maneuverIcon(instruction?.type);
   const headline = offRoute ? (returnGuidanceText ?? fr.navigation.offRoute) : arrived ? fr.navigation.instructions.arrived : instructionOrDefault(instruction, !route);
@@ -61,8 +61,8 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
 
         <div className="pointer-events-auto flex w-full max-w-xl flex-wrap items-center gap-2">
           <span className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-fg" data-testid="nav-gps">
-            <span className={cn("size-2 rounded-full", TONE_DOT[qualityTone(quality)])} aria-hidden="true" />
-            {qualityLabel(quality, output?.accuracy ?? null)}
+            <span className={cn("size-2 rounded-full", TONE_DOT[qualityTone(quality)], searching && "animate-pulse")} aria-hidden="true" />
+            {searching && quality === "lost" ? fr.navigation.gpsSearching : qualityLabel(quality, output?.accuracy ?? null)}
           </span>
           {route ? (
             <span className="glass inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-[13px] font-semibold text-fg" data-testid="nav-onpath">
@@ -82,8 +82,9 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
           {session?.simulate ? <span className="glass inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-semibold text-info">{fr.navigation.simulating}</span> : null}
         </div>
         {quality === "poor" || quality === "lost" ? (
-          <div className="glass pointer-events-auto w-full max-w-xl rounded-xl px-4 py-2 text-[13px] text-fg" role="status">
-            <span className="font-semibold">{quality === "lost" ? fr.navigation.gpsLost : fr.navigation.gpsWeak}.</span> {fr.navigation.gpsWeakBody}
+          <div className="glass pointer-events-auto w-full max-w-xl rounded-xl px-4 py-2 text-[13px] text-fg" role="status" data-testid="nav-gps-notice">
+            <span className="font-semibold">{quality === "lost" ? (searching ? fr.navigation.gpsSearching : fr.navigation.gpsLost) : fr.navigation.gpsWeak}</span>{" "}
+            {fr.navigation.gpsWeakBody}
           </div>
         ) : null}
       </div>

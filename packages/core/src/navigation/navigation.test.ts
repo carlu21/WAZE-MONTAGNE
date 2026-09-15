@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { haversineM, offsetPoint, type LngLat } from "../geo";
 import type { OfficialAlert, Report, WaterPoint } from "../types";
 import {
+  TRACKING_PROFILES,
   acceptTrackPoint,
+  accuracyQuality,
   addSegments,
   areConnected,
   axisDiff,
@@ -243,6 +245,20 @@ describe("map matching", () => {
     expect(gpsQuality({ accuracy: 30, at: 0 }, 1000)).toBe("fair");
     expect(gpsQuality({ accuracy: 80, at: 0 }, 1000)).toBe("poor");
     expect(gpsQuality({ accuracy: 8, at: 0 }, 60_000)).toBe("lost");
+    expect(gpsQuality(null)).toBe("lost");
+    // Le délai de silence s'adapte au mode de suivi (économie de batterie : relevés espacés).
+    expect(gpsQuality({ accuracy: 8, at: 0 }, 40_000, TRACKING_PROFILES.eco.staleAfterMs)).toBe("good");
+    expect(gpsQuality({ accuracy: 8, at: 0 }, 40_000, TRACKING_PROFILES.normal.staleAfterMs)).toBe("lost");
+    expect(accuracyQuality(null)).toBe("fair");
+    expect(accuracyQuality(12)).toBe("good");
+    expect(accuracyQuality(120)).toBe("poor");
+    // La localisation approchée ne sert à rien en montagne : le récepteur reste en haute précision,
+    // et aucune position en cache n'est acceptée (elle figerait le signal).
+    for (const p of Object.values(TRACKING_PROFILES)) {
+      expect(p.highAccuracy).toBe(true);
+      expect(p.maximumAgeMs).toBe(0);
+      expect(p.staleAfterMs).toBeGreaterThanOrEqual(p.intervalMs * 3);
+    }
     const p = offsetPoint(offsetPoint(ORIGIN, 300, 90), 45, 0);
     const good = matchFix(createMatchState(), fix(p, 0, { accuracy: 8 }), graph, opts).output;
     const poor = matchFix(createMatchState(), fix(p, 0, { accuracy: 60 }), graph, opts).output;

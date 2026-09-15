@@ -29,13 +29,24 @@ Le réducteur est pur : il ne dépend ni du DOM ni de MapLibre, ce qui permet de
 
 ## 2. Suivi de position (section 2)
 
-`GeolocationSource` utilise `navigator.geolocation.watchPosition` (position, précision, altitude, cap et vitesse fournis par le récepteur GNSS). Trois profils (`TRACKING_PROFILES`) :
+`GeolocationSource` utilise `navigator.geolocation.watchPosition` (position, précision, altitude, cap et vitesse fournis par le récepteur GNSS), toujours en **haute précision** : en montagne, sans réseau mobile ni Wi-Fi, la localisation approchée ne donne rien ; l'économie de batterie vient de l'espacement des relevés. Trois profils (`TRACKING_PROFILES`) :
 
 | Mode | Intervalle | Haute précision | Usage |
 | --- | --- | --- | --- |
 | Économie | 15 s | non | longues randonnées, autonomie |
 | Normal | 5 s | oui | défaut |
 | Précision élevée | chaque relevé (≈ 1 s) | oui | trail, VTT, passages techniques |
+
+**Le signal doit tenir.** `watchPosition` s'arrête silencieusement dans des situations très courantes : onglet en arrière-plan, écran verrouillé, tunnel, forêt dense, changement de réseau. La source ne se contente donc pas d'écouter :
+
+- une **veille** vérifie toutes les 5 s que des relevés arrivent encore et relance l'écoute (nouvelle `watchPosition` + demande immédiate) après un silence supérieur à `staleAfterMs` (20 à 45 s selon le mode, soit trois relevés manqués) ;
+- un **délai dépassé** ou une position indisponible relancent l'écoute au lieu d'abandonner ; l'utilisateur n'est prévenu qu'au troisième échec, et jamais plus d'une relance par seconde ;
+- le **retour au premier plan** (onglet, écran rallumé) relance immédiatement, et le premier relevé qui suit une relance est transmis sans attendre la cadence ;
+- la cadence est mesurée sur l'heure de **réception**, pas sur l'horodatage du récepteur : certains appareils répètent la même valeur (position en cache) ou la comptent depuis le démarrage, ce qui figerait l'âge du relevé et déclarerait le signal perdu en permanence (`normalizeFixTime`, horodatage strictement croissant) ;
+- aucune position en cache n'est acceptée (`maximumAge: 0`) ;
+- l'**écran est maintenu allumé** pendant l'activité (Screen Wake Lock, HTTPS obligatoire, repris au retour au premier plan) : un écran verrouillé suspend la page, donc le GPS et la trace.
+
+Seul un refus d'autorisation est définitif. Pendant une relance, l'affichage indique « Recherche du signal GPS… » et la position continue d'avancer à l'estime ; « Signal GPS retrouvé. » confirme le retour.
 
 La boussole (`compass.ts`, `deviceorientationabsolute` ou `webkitCompassHeading` après autorisation iOS) oriente le marqueur à l'arrêt et départage les chemins quand le déplacement est trop faible pour déduire un cap. L'altitude GPS alimente la trace et l'affichage ; le baromètre n'est pas exposé par les navigateurs (prévu côté natif, voir MOBILE.md).
 
@@ -111,7 +122,7 @@ Sans import, le jeu de démonstration installe un réseau densifié (sentiers de
 
 - Écran réduit à l'essentiel : carte, instruction, prochain événement, chips « Précision ±8 m » / « Sur : … », barre de statistiques, boutons Recentrer, Signaler (« + »), Revenir sur mes pas, Pause, Terminer.
 - Marqueur : flèche tournée selon le cap (point sans cap), halo, cercle d'incertitude au-delà de 12 m ; position **interpolée sur 600 ms** entre deux relevés (pas de saut).
-- Qualité : bonne ≤ 15 m, moyenne ≤ 35 m, faible au-delà, perdue après 30 s sans relevé (« Signal GPS faible / perdu », marqueur estompé, estimation à l'estime le long du chemin à la vitesse observée — `deadReckon`).
+- Qualité : bonne ≤ 15 m, moyenne ≤ 35 m, faible au-delà, perdue après `staleAfterMs` **sans relevé reçu** (« Signal GPS faible / perdu / Recherche du signal GPS… », marqueur estompé, estimation à l'estime le long du chemin à la vitesse observée — `deadReckon`). Le silence est mesuré sur l'heure de réception, et la source relance l'écoute en parallèle.
 
 ## 24. Scénario de démonstration
 

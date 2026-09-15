@@ -37,6 +37,8 @@ export interface NavLive {
   /** Distance au parcours (m) quand on l'a quitté. */
   offRouteDistanceM: number | null;
   quality: GpsQuality;
+  /** La source cherche un signal (relance de l'écoute en cours). */
+  searching: boolean;
   compassHeading: number | null;
   /** Dernière altitude GPS (m) ou null. */
   altitude: number | null;
@@ -60,6 +62,7 @@ export const EMPTY_LIVE: NavLive = {
   offRoute: false,
   offRouteDistanceM: null,
   quality: "lost",
+  searching: true,
   compassHeading: null,
   altitude: null,
   trackPoints: 0,

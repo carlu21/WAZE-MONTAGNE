@@ -10,6 +10,7 @@
 
 - L'application est conçue pour smartphone : sur un écran d'ordinateur, elle s'affiche dans un **cadre d'iPhone** (390 × 844, barre d'état, îlot dynamique, zones sûres) avec, à côté, l'adresse réseau et un **QR code**. `?frame=0` affiche l'application en plein écran ; le cadre disparaît de lui-même sur un vrai téléphone ou en mode installé.
 - `Lancer Mountain Live.command` sert l'application en **HTTPS** (certificat auto-signé, plugin Vite basic-ssl) : c'est ce qui permet au GPS, à la boussole et à la caméra de fonctionner sur un téléphone du même Wi-Fi (`https://<adresse-du-mac>:5173`, affichée dans le Terminal et dans le panneau QR).
+- **Suivi GPS en marche** : gardez l'application au premier plan. L'écran est maintenu allumé automatiquement pendant une activité (Screen Wake Lock, iOS 16.4+), mais si vous verrouillez l'écran ou changez d'application, iOS suspend la page : le GPS et l'enregistrement de la trace s'arrêtent, puis reprennent au retour (la veille relance l'écoute et la trace continue). Le suivi réellement continu en arrière-plan demandera l'application native (Capacitor).
 - Sur l'iPhone, Safari affiche un avertissement la première fois : « Afficher les détails » → « visiter ce site web ». Puis Partager → « Sur l'écran d'accueil ». Avec ce certificat non reconnu, le service worker (mode hors connexion) n'est pas activé sur iOS ; le reste fonctionne. En production, un certificat valide lève cette limite.
 - `MOUNTAIN_LIVE_HTTP=1 pnpm dev` revient au HTTP simple (tests automatisés, dépannage).
 
@@ -17,7 +18,7 @@
 
 | Sujet | Mise en œuvre |
 | --- | --- |
-| Localisation | demandée après explication (onboarding), `watchPosition` haute précision limité à une mise à jour toutes les 5 s ; jamais publiée individuellement |
+| Localisation | demandée après explication (onboarding), `watchPosition` haute précision limité à une mise à jour toutes les 5 s ; jamais publiée individuellement. Pendant une navigation : veille qui relance l'écoute après un silence, relance au retour au premier plan, écran maintenu allumé (Screen Wake Lock) |
 | Caméra | `input capture="environment"`, redimensionnement à 1600 px / JPEG 0,8 avant envoi (économie de données) |
 | Batterie | rafraîchissement des données toutes les 60 s seulement, présence toutes les 5 min, alertes calculées localement toutes les 20 s ou après 50 m |
 | Gants / soleil / pluie | cibles ≥ 48 px (56–64 px pour les actions principales), contraste AA, texte 16–17 px, une main, mode sombre |

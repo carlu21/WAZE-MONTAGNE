@@ -101,14 +101,30 @@ export function createMatchState(): MatchState {
   return { hypotheses: [], lastFix: null, recent: [], heading: null, speedMs: null, lastOutput: null };
 }
 
-/** Qualité du signal (section 21) : selon la précision et l'âge du relevé. */
-export function gpsQuality(fix: Pick<GpsFix, "accuracy" | "at"> | null, now: number = Date.now()): GpsQuality {
-  if (!fix) return "lost";
-  if (now - fix.at > 30_000) return "lost";
-  if (fix.accuracy === null || !Number.isFinite(fix.accuracy)) return "fair";
-  if (fix.accuracy <= 15) return "good";
-  if (fix.accuracy <= 35) return "fair";
+/** Délai (ms) sans relevé au-delà duquel le signal est considéré perdu. */
+export const DEFAULT_STALE_AFTER_MS = 30_000;
+
+/** Qualité déduite de la seule précision annoncée (section 21). */
+export function accuracyQuality(accuracy: number | null | undefined): Exclude<GpsQuality, "lost"> {
+  if (accuracy === null || accuracy === undefined || !Number.isFinite(accuracy)) return "fair";
+  if (accuracy <= 15) return "good";
+  if (accuracy <= 35) return "fair";
   return "poor";
+}
+
+/**
+ * Qualité du signal (section 21) : précision annoncée, et « perdu » quand le
+ * dernier relevé remonte à plus de `staleAfterMs` (adapté au mode de suivi :
+ * en économie de batterie, les relevés sont naturellement plus espacés).
+ */
+export function gpsQuality(
+  fix: Pick<GpsFix, "accuracy" | "at"> | null,
+  now: number = Date.now(),
+  staleAfterMs: number = DEFAULT_STALE_AFTER_MS,
+): GpsQuality {
+  if (!fix) return "lost";
+  if (now - fix.at > staleAfterMs) return "lost";
+  return accuracyQuality(fix.accuracy);
 }
 
 /** Cap de déplacement : cap GPS si fiable, sinon déduit des derniers relevés. */

@@ -10,12 +10,13 @@
  */
 import { useEffect, useRef } from "react";
 import {
+  TRACKING_PROFILES,
+  accuracyQuality,
   collectRouteEvents,
   computeManeuvers,
   createNavState,
   deadReckon,
   fr,
-  gpsQuality,
   navigationStep,
   trackStats,
   type GpsFix,
@@ -34,6 +35,7 @@ import { GeolocationSource, SimulationSource, type PositionSource } from "./sour
 import { speak, stopSpeaking, vibrate } from "./speech";
 import { useNavigationStore } from "./store";
 import { clearCurrentTrack, persistCurrentTrack } from "./tracks";
+import { keepScreenAwake, releaseScreen } from "./wakeLock";
 
 /** Intervalle de rafraîchissement des événements (ms). */
 export const DATA_REFRESH_MS = 120_000;
@@ -113,6 +115,7 @@ export function useNavigationEngine(): void {
       const st = useNavigationStore.getState();
       if (st.status !== "running" || !st.session) return;
       lastFixAt.current = Date.now();
+      if (st.live.searching) st.setLive({ searching: false });
       useUiStore.getState().setPosition({ lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy === null ? null : Math.round(fix.accuracy), at: fix.at });
       const ld = loader.current!;
       void ld.ensureAround(fix).then(() => st.setLive({ loadingNetwork: ld.loading }));
@@ -187,19 +190,38 @@ export function useNavigationEngine(): void {
         ? new SimulationSource(session.route, { speedMs: session.simulation?.speedMs ?? 1.4 * 6, intervalMs: 700, detour: session.simulation?.detour ?? null })
         : new GeolocationSource(trackingMode);
     source.current = src;
-    src.start(onFix, (message, code) => {
-      toast.warning(code === "denied" ? fr.navigation.gpsDenied : message);
-      if (code === "denied") useNavigationStore.getState().setLive({ quality: "lost" });
-    });
+    lastFixAt.current = Date.now();
+    src.start(
+      onFix,
+      (message, code) => {
+        toast.warning(code === "denied" ? fr.navigation.gpsDenied : message);
+        if (code === "denied") useNavigationStore.getState().setLive({ quality: "lost", searching: false });
+      },
+      (sourceStatus) => useNavigationStore.getState().setLive({ searching: sourceStatus === "searching" }),
+    );
+    // L'écran verrouillé suspend la page (et donc le GPS) : on le maintient allumé.
+    if (!session.simulate) keepScreenAwake();
 
-    // Signal perdu : au-delà de 30 s sans relevé, la qualité passe à « lost » et la
-    // position est estimée à partir de la trajectoire (section 22).
+    /*
+     * Signal perdu : mesuré sur l'heure de RÉCEPTION du dernier relevé (et non
+     * sur l'horodatage du récepteur, peu fiable selon les appareils), avec un
+     * délai adapté au mode de suivi. La position continue d'avancer à l'estime
+     * le long du chemin (section 22) ; la source relance l'écoute de son côté.
+     */
+    const staleAfterMs = TRACKING_PROFILES[trackingMode].staleAfterMs;
     const stale = window.setInterval(() => {
       const st = useNavigationStore.getState();
       const out = st.live.output;
-      if (!out) return;
-      const q = gpsQuality({ accuracy: out.accuracy, at: out.at }, Date.now());
-      if (q !== st.live.quality && q === "lost") st.setLive({ quality: "lost", output: { ...out, position: deadReckon(out, Date.now()), quality: "lost" } });
+      if (!out || st.status !== "running") return;
+      const silentMs = Date.now() - lastFixAt.current;
+      const q = silentMs > staleAfterMs ? "lost" : accuracyQuality(out.accuracy);
+      if (q === st.live.quality) return;
+      if (q === "lost") st.setLive({ quality: "lost", output: { ...out, position: deadReckon(out, Date.now()), quality: "lost" } });
+      else {
+        // Retour du signal : la position reprend sans saut (interpolation de la couche).
+        if (st.live.quality === "lost") toast.success(fr.navigation.gpsBack);
+        st.setLive({ quality: q });
+      }
     }, STALE_CHECK_MS);
     const refresh = window.setInterval(() => void refreshData(dataCenter.current ?? undefined), DATA_REFRESH_MS);
 
@@ -210,6 +232,7 @@ export function useNavigationEngine(): void {
       window.clearInterval(stale);
       window.clearInterval(refresh);
       stopSpeaking();
+      releaseScreen();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, routeId, mode, simulate, trackingMode]);

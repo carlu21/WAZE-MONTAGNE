@@ -159,9 +159,20 @@ export function navigationStep(state: NavState, ctx: NavContext, fix: GpsFix, no
   return { state: nextState, output, progress, instruction, announceInstruction, alerts, offRouteChange, justArrived, trackPointAdded, nextEvent, events };
 }
 
-/** Intervalle de relevé (ms) et précision demandée par mode de suivi (section 2). */
+/**
+ * Cadence des relevés par mode de suivi (section 2).
+ *
+ * - `highAccuracy` est toujours vrai : en montagne, sans réseau mobile ni
+ *   Wi-Fi, la localisation approchée ne donne rien ; l'économie de batterie
+ *   vient de l'espacement des relevés (`intervalMs`), pas de la dégradation
+ *   du récepteur.
+ * - `maximumAgeMs` reste à 0 : une position en cache renvoyée plusieurs fois
+ *   ferait croire à un signal figé.
+ * - `staleAfterMs` : silence au-delà duquel le signal est déclaré perdu et la
+ *   veille relance l'écoute (trois relevés manqués, au moins 20 s).
+ */
 export const TRACKING_PROFILES = {
-  eco: { intervalMs: 15_000, highAccuracy: false, maximumAgeMs: 15_000 },
-  normal: { intervalMs: 5_000, highAccuracy: true, maximumAgeMs: 5_000 },
-  precise: { intervalMs: 1_000, highAccuracy: true, maximumAgeMs: 0 },
+  eco: { intervalMs: 15_000, highAccuracy: true, maximumAgeMs: 0, staleAfterMs: 45_000 },
+  normal: { intervalMs: 5_000, highAccuracy: true, maximumAgeMs: 0, staleAfterMs: 25_000 },
+  precise: { intervalMs: 1_000, highAccuracy: true, maximumAgeMs: 0, staleAfterMs: 20_000 },
 } as const;
