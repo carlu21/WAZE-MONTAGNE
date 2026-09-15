@@ -16,7 +16,7 @@ type Errors = Partial<Record<"email" | "password" | "pseudo" | "consent" | "form
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/map";
+  const from = (location.state as { from?: string } | null)?.from ?? "/navigate";
   const setSession = useSessionStore((s) => s.setSession);
   const setOnboardingDone = useSessionStore((s) => s.setOnboardingDone);
   const setFilters = useUiStore((s) => s.setFilters);

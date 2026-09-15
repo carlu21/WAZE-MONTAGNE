@@ -26,6 +26,8 @@ import {
   type ContentFlag,
   type OfficialAlert,
   type Trail,
+  type TrailSummary,
+  type NetworkStats,
   type WaterPoint,
   type PathSegment,
   type RegisterInput,
@@ -165,6 +167,8 @@ export const api = {
   },
   trails: (bbox: BBox) => request<{ trails: Trail[] }>("GET", `/trails${q({ bbox: bboxParam(bbox) })}`),
   trail: (id: string) => request<{ trail: Trail }>("GET", `/trails/${encodeURIComponent(id)}`),
+  trailSummaries: (bbox: BBox) => request<{ trails: TrailSummary[] }>("GET", `/trails${q({ bbox: bboxParam(bbox), summary: 1 })}`),
+  networkStats: () => request<NetworkStats>("GET", "/paths/stats"),
   paths: (bbox: BBox) => request<{ paths: PathSegment[]; truncated: boolean }>("GET", `/paths${q({ bbox: bboxParam(bbox) })}`),
   waterPoints: (bbox: BBox) =>
     request<{ waterPoints: WaterPoint[] }>("GET", `/water-points${q({ bbox: bboxParam(bbox) })}`),

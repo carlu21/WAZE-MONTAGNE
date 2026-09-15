@@ -7,6 +7,13 @@
  *   pnpm --filter @mountain-live/api geo:import-osm -- --file ./sentiers.geojson  # export GeoJSON (Overpass Turbo, QGIS…)
  *   pnpm --filter @mountain-live/api geo:import-osm -- --url https://overpass.kumi.systems/api/interpreter
  *
+ *   pnpm --filter @mountain-live/api geo:import-osm -- --routes-only   # itinéraires balisés seulement (GR, PR, VTT…)
+ *   pnpm --filter @mountain-live/api geo:import-osm -- --paths-only    # réseau de chemins seulement
+ *
+ * Deux phases : le réseau de chemins (ways `highway=path|track|…`, par dalles de 0,25°) puis les
+ * itinéraires balisés (relations `route=hiking|foot|mtb|horse|running`, par dalles de 0,5°) dont la
+ * géométrie est assemblée et enregistrée dans `trails` (GR 20, Mare a Mare, boucles locales…).
+ *
  * Données © les contributeurs OpenStreetMap, licence ODbL (https://www.openstreetmap.org/copyright).
  * L'emprise est découpée en dalles de 0,25° pour rester sous les limites d'Overpass ; l'import est
  * idempotent (identifiants osm_<way>) : relancer met à jour les segments existants.
@@ -16,8 +23,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BBox, PathSegment } from "@mountain-live/core";
 import { ensureDatabase } from "./migrate";
-import { overpassQuery, segmentsFromGeoJson, segmentsFromOverpass, type OverpassJson } from "../services/osm";
+import { overpassQuery, overpassRoutesQuery, routesFromOverpass, segmentsFromGeoJson, segmentsFromOverpass, type OverpassJson } from "../services/osm";
 import { countPaths, upsertPaths } from "../services/paths";
+import { networkStats, upsertTrails } from "../services/reference";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.resolve(here, "..", "..", "data", "osm");
@@ -31,10 +39,12 @@ interface Options {
   file: string | null;
   url: string;
   tile: number;
+  paths: boolean;
+  routes: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
-  const opts: Options = { bbox: CORSICA, file: null, url: DEFAULT_URL, tile: TILE_DEG };
+  const opts: Options = { bbox: CORSICA, file: null, url: DEFAULT_URL, tile: TILE_DEG, paths: true, routes: true };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const value = (): string => {
@@ -50,8 +60,10 @@ function parseArgs(argv: string[]): Options {
     } else if (a.startsWith("--file")) opts.file = value();
     else if (a.startsWith("--url")) opts.url = value();
     else if (a.startsWith("--tile")) opts.tile = Number(value()) || TILE_DEG;
+    else if (a === "--routes-only") opts.paths = false;
+    else if (a === "--paths-only") opts.routes = false;
     else if (a === "--help" || a === "-h") {
-      console.log("Options : --bbox ouest,sud,est,nord | --file <overpass.json|export.geojson> | --url <overpass> | --tile 0.25");
+      console.log("Options : --bbox ouest,sud,est,nord | --file <overpass.json|export.geojson> | --url <overpass> | --tile 0.25 | --routes-only | --paths-only");
       process.exit(0);
     }
   }
@@ -68,11 +80,11 @@ function tiles(b: BBox, step: number): BBox[] {
   return out;
 }
 
-async function fetchTile(url: string, b: BBox): Promise<OverpassJson> {
-  const key = `${b.west.toFixed(3)}_${b.south.toFixed(3)}_${b.east.toFixed(3)}_${b.north.toFixed(3)}.json`;
+async function fetchTile(url: string, b: BBox, kind: "paths" | "routes" = "paths"): Promise<OverpassJson> {
+  const key = `${kind === "routes" ? "routes_" : ""}${b.west.toFixed(3)}_${b.south.toFixed(3)}_${b.east.toFixed(3)}_${b.north.toFixed(3)}.json`;
   const cached = path.join(CACHE_DIR, key);
   if (fs.existsSync(cached)) return JSON.parse(fs.readFileSync(cached, "utf8")) as OverpassJson;
-  const body = `data=${encodeURIComponent(overpassQuery(b))}`;
+  const body = `data=${encodeURIComponent(kind === "routes" ? overpassRoutesQuery(b) : overpassQuery(b))}`;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
@@ -111,16 +123,33 @@ async function main(): Promise<void> {
     total += upsertPaths(segments);
     console.log(`[osm] ${segments.length} segments lus dans ${opts.file}.`);
   } else {
-    const all = tiles(opts.bbox, opts.tile);
-    console.log(`[osm] ${all.length} dalles à interroger sur ${opts.url} (cache : ${path.relative(process.cwd(), CACHE_DIR)}).`);
-    for (const [i, b] of all.entries()) {
-      const json = await fetchTile(opts.url, b);
-      const segments = segmentsFromOverpass(json);
-      total += upsertPaths(segments);
-      console.log(`[osm] dalle ${i + 1}/${all.length} : ${segments.length} segments.`);
+    if (opts.paths) {
+      const all = tiles(opts.bbox, opts.tile);
+      console.log(`[osm] Réseau de chemins : ${all.length} dalles à interroger sur ${opts.url} (cache : ${path.relative(process.cwd(), CACHE_DIR)}).`);
+      for (const [i, b] of all.entries()) {
+        const json = await fetchTile(opts.url, b, "paths");
+        const segments = segmentsFromOverpass(json);
+        total += upsertPaths(segments);
+        console.log(`[osm] dalle ${i + 1}/${all.length} : ${segments.length} segments.`);
+      }
+    }
+    if (opts.routes) {
+      const all = tiles(opts.bbox, Math.max(opts.tile, 0.5));
+      console.log(`[osm] Itinéraires balisés : ${all.length} dalles.`);
+      const seen = new Set<string>();
+      let routes = 0;
+      for (const [i, b] of all.entries()) {
+        const json = await fetchTile(opts.url, b, "routes");
+        const found = routesFromOverpass(json).filter((t) => !seen.has(t.id));
+        for (const t of found) seen.add(t.id);
+        routes += upsertTrails(found);
+        console.log(`[osm] dalle ${i + 1}/${all.length} : ${found.length} itinéraires (${found.slice(0, 3).map((t) => t.name).join(", ")}${found.length > 3 ? "…" : ""}).`);
+      }
+      console.log(`[osm] ${routes} itinéraires importés ou mis à jour.`);
     }
   }
-  console.log(`[osm] Terminé : ${total} segments importés ou mis à jour. La base compte ${countPaths()} segments (${before} avant).`);
+  const stats = networkStats();
+  console.log(`[osm] Terminé : ${total} segments importés ou mis à jour. La base compte ${countPaths()} segments (${before} avant) et ${stats.trails.total} itinéraires dont ${stats.trails.osm} OpenStreetMap.`);
 }
 
 main().catch((err) => {

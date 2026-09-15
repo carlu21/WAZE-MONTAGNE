@@ -20,6 +20,7 @@ export const fr = {
 
   /** Barre de navigation (section 3). */
   nav: {
+    navigate: "Itinéraire",
     map: "Carte",
     explore: "Explorer",
     report: "Signaler",
@@ -445,6 +446,13 @@ export const fr = {
   navigation: {
     title: "Navigation",
     subtitle: "Suivi GPS sur les sentiers",
+    homeTitle: "Démarrer un itinéraire",
+    homeSubtitle: "Choisissez un sentier, importez une trace ou partez librement : la carte vous suit sur le chemin.",
+    searchRoutes: "Rechercher un itinéraire (GR 20, Mare a Mare, lac…)",
+    results: "Résultats",
+    selectedRoute: "Itinéraire choisi",
+    settings: "Réglages",
+    demoNetwork: "Sentiers de démonstration : les vrais sentiers et itinéraires OpenStreetMap s'importent automatiquement au lancement connecté (ou via « Importer les sentiers (OpenStreetMap).command »).",
     start: "Démarrer",
     startFree: "Explorer librement",
     startRoute: "Suivre cet itinéraire",

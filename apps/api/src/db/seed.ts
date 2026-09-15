@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   SUBTYPE_BY_ID,
   type AreaType,
@@ -542,13 +542,13 @@ function wipe(): void {
     partners,
     userPreferences,
     users,
-    trails,
     waterPoints,
     areas,
   ];
   for (const t of tables) db.delete(t).run();
-  // Le réseau importé (OpenStreetMap) est conservé : seuls les segments de démonstration sont rejoués.
+  // Le réseau et les itinéraires importés (OpenStreetMap) sont conservés : seule la démonstration est rejouée.
   db.delete(paths).where(eq(paths.source, "seed")).run();
+  db.delete(trails).where(sql`${trails.id} NOT LIKE 'osm_rel_%'`).run();
 }
 
 /** Lieux, sentiers et points d'eau (données de référence, sans compte). */

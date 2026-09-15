@@ -54,15 +54,16 @@ La recherche (barre de la carte, page Explorer) combine trois sources :
 
 ## Navigation GPS sur les sentiers
 
-Le module de navigation (« Waze de la montagne ») suit la position GPS, la **rattache au chemin le plus probable** (map matching sur le réseau de sentiers), guide pas à pas sur un itinéraire (sentier de la base, trace GPX importée ou trace enregistrée), détecte les sorties de parcours, enregistre un fil d'Ariane et annonce les **signalements situés devant vous** par paliers de distance. Écran `/navigate` (bouton « Navigation » sur la carte, entrée dans Explorer, « Démarrer » sur un sentier d'une fiche de secteur).
+L'application s'ouvre sur **« Démarrer un itinéraire »**. Le module de navigation (« Waze de la montagne ») suit la position GPS, la **rattache au chemin le plus probable** (map matching sur le réseau de sentiers), guide pas à pas sur un itinéraire (sentier de la base, trace GPX importée ou trace enregistrée), détecte les sorties de parcours, enregistre un fil d'Ariane et annonce les **signalements situés devant vous** par paliers de distance. Écran `/navigate` (bouton « Navigation » sur la carte, entrée dans Explorer, « Démarrer » sur un sentier d'une fiche de secteur).
 
 - Sur ordinateur, activez « Simuler ce parcours (démo) » à la préparation, ou ouvrez directement `http://localhost:5173/navigate?trail=t_restonica_melo&simulate=1&autostart=1`.
-- Le jeu de démonstration contient un réseau de sentiers densifié ; pour le vrai réseau, importez OpenStreetMap (licence ODbL) :
+- **Vrais sentiers et itinéraires** : au lancement par `Lancer Mountain Live.command`, s'ils ne sont pas encore en base et que la connexion le permet, le réseau de chemins et les itinéraires balisés de Corse (GR 20, Mare a Mare, Mare e Monti, boucles locales…) sont importés d'OpenStreetMap en arrière-plan (licence ODbL, quelques minutes, journal `apps/api/data/osm/import.log`). À la main :
 
    ```bash
    pnpm --filter @mountain-live/api geo:import-osm                              # Corse (Overpass)
    pnpm --filter @mountain-live/api geo:import-osm -- --bbox 8.9,42.1,9.2,42.4  # une zone
    pnpm --filter @mountain-live/api geo:import-osm -- --file export.geojson     # fichier (Overpass Turbo, QGIS…)
+   pnpm --filter @mountain-live/api geo:import-osm -- --routes-only            # itinéraires balisés seulement
    ```
 
    ou double-cliquez sur `Importer les sentiers (OpenStreetMap).command`.

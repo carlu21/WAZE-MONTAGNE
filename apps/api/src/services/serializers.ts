@@ -12,6 +12,7 @@ import {
   type Report,
   type ReportComment,
   type Trail,
+  type TrailSummary,
   type UserMe,
   type UserPublic,
   type UserPreferences,
@@ -196,6 +197,15 @@ export function toTrail(row: TrailRow): Trail {
     geometry: row.geometry,
     description: row.description ?? null,
   };
+}
+
+export function toTrailSummary(row: TrailRow): TrailSummary {
+  const coords = row.geometry.type === "LineString" ? row.geometry.coordinates : [];
+  const first = coords[0] ?? [row.minLng, row.minLat];
+  const last = coords[coords.length - 1] ?? first;
+  const { geometry: _geometry, ...rest } = toTrail(row);
+  void _geometry;
+  return { ...rest, start: { lng: first[0], lat: first[1] }, end: { lng: last[0], lat: last[1] }, points: coords.length };
 }
 
 export function toWaterPoint(row: WaterPointRow): WaterPoint {

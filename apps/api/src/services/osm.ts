@@ -152,3 +152,198 @@ export function overpassQuery(bbox: { west: number; south: number; east: number;
   const re = `^(${HIGHWAY_FILTER.join("|")})$`;
   return `[out:json][timeout:${timeoutS}];(way["highway"~"${re}"](${b}););out body;>;out skel qt;`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Itinéraires balisés : relations `route=hiking|foot|mtb|horse|running` */
+/* ------------------------------------------------------------------ */
+
+export interface OverpassRelation {
+  type: "relation";
+  id: number;
+  members: { type: "node" | "way" | "relation"; ref: number; role?: string }[];
+  tags?: Record<string, string>;
+}
+
+export interface ImportedTrail {
+  id: string;
+  name: string;
+  type: "hiking" | "trail" | "mtb" | "equestrian" | "mixed";
+  difficulty: "easy" | "moderate" | "hard" | "expert";
+  distanceKm: number;
+  elevationGainM: number;
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+  description: string | null;
+  /** Nombre de tronçons non raccordés (qualité de la donnée). */
+  gaps: number;
+}
+
+const ROUTE_TYPES: Record<string, ImportedTrail["type"]> = { hiking: "hiking", foot: "hiking", running: "trail", mtb: "mtb", horse: "equestrian" };
+const SKIP_ROLES = /alternative|excursion|approach|connection|variant|shortcut/i;
+const SAC_ORDER = ["hiking", "mountain_hiking", "demanding_mountain_hiking", "alpine_hiking", "demanding_alpine_hiking", "difficult_alpine_hiking"];
+
+/** Requête Overpass : itinéraires balisés dont au moins un membre touche l'emprise, membres inclus (récursif). */
+export function overpassRoutesQuery(bbox: { west: number; south: number; east: number; north: number }, timeoutS = 300): string {
+  const b = `${bbox.south},${bbox.west},${bbox.north},${bbox.east}`;
+  return `[out:json][timeout:${timeoutS}];relation["type"~"^(route|superroute)$"]["route"~"^(hiking|foot|mtb|horse|running)$"](${b})->.r;.r out body;.r >> ->.m;.m out body qt;`;
+}
+
+function key(c: LngLat): string {
+  return `${Math.round(c[0] * 1e6)}:${Math.round(c[1] * 1e6)}`;
+}
+
+/** Enchaîne des tronçons par leurs extrémités communes (sens inversé au besoin). */
+export function chainWays(ways: readonly LngLat[][]): LngLat[][] {
+  const remaining = ways.filter((w) => w.length >= 2).map((w) => w.map((c) => [c[0], c[1]] as LngLat));
+  const parts: LngLat[][] = [];
+  while (remaining.length) {
+    const part = remaining.shift()!;
+    let extended = true;
+    while (extended) {
+      extended = false;
+      const head = key(part[0]);
+      const tail = key(part[part.length - 1]);
+      for (let i = 0; i < remaining.length; i++) {
+        const w = remaining[i];
+        const ws = key(w[0]);
+        const we = key(w[w.length - 1]);
+        if (ws === tail) part.push(...w.slice(1));
+        else if (we === tail) part.push(...[...w].reverse().slice(1));
+        else if (we === head) part.unshift(...w.slice(0, -1));
+        else if (ws === head) part.unshift(...[...w].reverse().slice(0, -1));
+        else continue;
+        remaining.splice(i, 1);
+        extended = true;
+        break;
+      }
+    }
+    parts.push(part);
+  }
+  return parts;
+}
+
+function distM(a: LngLat, b: LngLat): number {
+  const cos = Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
+  return Math.hypot((a[0] - b[0]) * 111_320 * cos, (a[1] - b[1]) * 111_320);
+}
+
+/** Raccorde des tronçons dans l'ordre en choisissant l'orientation qui minimise l'écart ; renvoie le nombre d'écarts > 50 m. */
+export function mergeParts(parts: readonly LngLat[][]): { line: LngLat[]; gaps: number } {
+  if (parts.length === 0) return { line: [], gaps: 0 };
+  const pool = parts.map((p) => [...p]);
+  const line = pool.shift()!;
+  let gaps = 0;
+  while (pool.length) {
+    const end = line[line.length - 1];
+    let best = 0;
+    let bestD = Infinity;
+    let reverse = false;
+    for (let i = 0; i < pool.length; i++) {
+      const p = pool[i];
+      const d0 = distM(end, p[0]);
+      const d1 = distM(end, p[p.length - 1]);
+      if (d0 < bestD) {
+        bestD = d0;
+        best = i;
+        reverse = false;
+      }
+      if (d1 < bestD) {
+        bestD = d1;
+        best = i;
+        reverse = true;
+      }
+    }
+    const [next] = pool.splice(best, 1);
+    const seq = reverse ? [...next].reverse() : next;
+    if (bestD > 50) gaps++;
+    line.push(...(bestD < 1 ? seq.slice(1) : seq));
+  }
+  return { line, gaps };
+}
+
+function difficultyFromSac(scales: readonly string[]): ImportedTrail["difficulty"] {
+  let max = -1;
+  for (const s of scales) max = Math.max(max, SAC_ORDER.indexOf(s));
+  if (max <= 0) return max === 0 ? "easy" : "moderate";
+  if (max === 1) return "moderate";
+  if (max === 2) return "hard";
+  return "expert";
+}
+
+function lengthM(line: readonly LngLat[]): number {
+  let total = 0;
+  for (let i = 1; i < line.length; i++) total += distM(line[i - 1], line[i]);
+  return total;
+}
+
+/** Relations d'itinéraires → sentiers (géométrie assemblée, longueur, difficulté, description). */
+export function routesFromOverpass(json: OverpassJson, opts: { minLengthM?: number } = {}): ImportedTrail[] {
+  const minLength = opts.minLengthM ?? 800;
+  const nodes = new Map<number, LngLat>();
+  const ways = new Map<number, { coords: LngLat[]; tags: Record<string, string> }>();
+  const relations = new Map<number, OverpassRelation>();
+  for (const el of json.elements ?? []) {
+    if (el.type === "node") {
+      const n = el as OverpassNode;
+      if (Number.isFinite(n.lat) && Number.isFinite(n.lon)) nodes.set(n.id, [n.lon, n.lat]);
+    } else if (el.type === "way") {
+      const w = el as OverpassWay;
+      const coords: LngLat[] = [];
+      for (const id of w.nodes) {
+        const c = nodes.get(id);
+        if (c) coords.push(c);
+      }
+      ways.set(w.id, { coords, tags: w.tags ?? {} });
+    } else if (el.type === "relation") relations.set((el as OverpassRelation).id, el as OverpassRelation);
+  }
+  // Les nœuds peuvent arriver après les chemins (out qt) : seconde passe.
+  for (const el of json.elements ?? []) {
+    if (el.type !== "way") continue;
+    const w = el as OverpassWay;
+    const entry = ways.get(w.id);
+    if (entry && entry.coords.length < w.nodes.length) entry.coords = w.nodes.map((id) => nodes.get(id)).filter((c): c is LngLat => Boolean(c));
+  }
+
+  const collect = (rel: OverpassRelation, visited: Set<number>, out: { coords: LngLat[]; tags: Record<string, string> }[]): void => {
+    if (visited.has(rel.id)) return;
+    visited.add(rel.id);
+    for (const m of rel.members ?? []) {
+      if (m.role && SKIP_ROLES.test(m.role)) continue;
+      if (m.type === "way") {
+        const w = ways.get(m.ref);
+        if (w && w.coords.length >= 2) out.push(w);
+      } else if (m.type === "relation") {
+        const sub = relations.get(m.ref);
+        if (sub) collect(sub, visited, out);
+      }
+    }
+  };
+
+  const out: ImportedTrail[] = [];
+  for (const rel of relations.values()) {
+    const tags = rel.tags ?? {};
+    const type = ROUTE_TYPES[tags.route ?? ""];
+    if (!type || !(tags.type === "route" || tags.type === "superroute")) continue;
+    const members: { coords: LngLat[]; tags: Record<string, string> }[] = [];
+    collect(rel, new Set(), members);
+    if (members.length === 0) continue;
+    const parts = chainWays(members.map((m) => m.coords));
+    const { line, gaps } = mergeParts(parts);
+    const total = lengthM(line);
+    if (line.length < 2 || total < minLength) continue;
+    const ascent = Number(String(tags.ascent ?? "").replace(/[^\d.]/g, ""));
+    const name = tags.name ?? tags.ref ?? (tags.from && tags.to ? `${tags.from} → ${tags.to}` : `Itinéraire ${rel.id}`);
+    const descParts = [tags.description ?? tags.note ?? null, tags.from && tags.to && !name.includes(tags.from) ? `${tags.from} → ${tags.to}` : null, tags.operator ? `Balisage : ${tags.operator}` : null].filter(Boolean);
+    out.push({
+      id: `osm_rel_${rel.id}`,
+      name,
+      type,
+      difficulty: difficultyFromSac(members.map((m) => m.tags.sac_scale).filter((s): s is string => Boolean(s))),
+      distanceKm: Math.round(total / 100) / 10,
+      elevationGainM: Number.isFinite(ascent) && ascent > 0 ? Math.round(ascent) : 0,
+      geometry: { type: "LineString", coordinates: line.map((c) => [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6]) },
+      description: descParts.length ? descParts.join(" · ") : null,
+      gaps,
+    });
+  }
+  return out.sort((a, b) => b.distanceKm - a.distanceKm);
+}

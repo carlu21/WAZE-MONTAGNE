@@ -26,11 +26,11 @@ describe("<AppShell />", () => {
     renderShell();
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.textContent?.trim())).toEqual(["Carte", "Explorer", "Signaler", "Communauté", "Profil"]);
+    expect(links.map((l) => l.textContent?.trim())).toEqual(["Itinéraire", "Carte", "Signaler", "Explorer", "Profil"]);
     expect(within(nav).getByRole("link", { name: "Signaler" })).toHaveAttribute("href", "/report");
     expect(within(nav).getByRole("link", { name: "Carte" })).toHaveAttribute("href", "/map");
     expect(within(nav).getByRole("link", { name: "Explorer" })).toHaveAttribute("href", "/explore");
-    expect(within(nav).getByRole("link", { name: "Communauté" })).toHaveAttribute("href", "/community");
+    expect(within(nav).getByRole("link", { name: "Itinéraire" })).toHaveAttribute("href", "/navigate");
     expect(within(nav).getByRole("link", { name: "Profil" })).toHaveAttribute("href", "/profile");
   });
 
@@ -57,7 +57,7 @@ describe("<AppShell />", () => {
   });
 
   it("considère « Autour de moi » et les fiches comme des sous-écrans de la carte", () => {
-    const map = NAV_ENTRIES[0];
+    const map = NAV_ENTRIES[1];
     expect(isNavActive(map, "/around")).toBe(true);
     expect(isNavActive(map, "/reports/abc")).toBe(true);
     expect(isNavActive(map, "/mapping")).toBe(false);

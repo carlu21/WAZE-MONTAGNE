@@ -48,6 +48,7 @@ export const router = createBrowserRouter([
       </AppShell>
     ),
     children: [
+      { path: "/navigate", element: <S><NavigationPage /></S> },
       { path: "/map", element: <S><MapPage /></S> },
       { path: "/explore", element: <S><ExplorePage /></S> },
       { path: "/explore/:areaId", element: <S><AreaPage /></S> },
@@ -62,7 +63,6 @@ export const router = createBrowserRouter([
     ],
   },
   // Écrans plein écran (sans barre de navigation)
-  { path: "/navigate", element: <S><NavigationPage /></S> },
   { path: "/report", element: <S><RequireAuth><ReportWizardPage /></RequireAuth></S> },
   { path: "/report/:step", element: <S><RequireAuth><ReportWizardPage /></RequireAuth></S> },
   { path: "/flag/:reportId", element: <S><RequireAuth><FlagContentPage /></RequireAuth></S> },
@@ -74,6 +74,6 @@ export const router = createBrowserRouter([
     path: "/pro/*",
     element: <S><RequireRole roles={["official", "partner", "admin"]}><ProDashboardPage /></RequireRole></S>,
   },
-  { path: "/home", element: <Navigate to="/map" replace /> },
+  { path: "/home", element: <Navigate to="/navigate" replace /> },
   { path: "*", element: <S><NotFoundPage /></S> },
 ]);

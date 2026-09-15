@@ -2,7 +2,7 @@
 
 ## Livré (MVP — section 29)
 
-1. inscription / connexion · 2. onboarding · 3. carte · 4. géolocalisation · 5. signalements · 6. catégories · 7. photos · 8. confirmation communautaire · 9. expiration automatique · 10. filtres · 11. alertes simples · 12. profil · 13. hors connexion basique · 14. back-office de modération — plus Explorer, Autour de moi, notifications in-app, communauté, tableau de bord professionnel (version pilote), et le **module de navigation GPS sur les sentiers** (map matching, guidage pas à pas, sortie d'itinéraire, fil d'Ariane, alertes devant soi, GPX, hors connexion — [NAVIGATION_GPS.md](NAVIGATION_GPS.md)).
+1. inscription / connexion · 2. onboarding · 3. carte · 4. géolocalisation · 5. signalements · 6. catégories · 7. photos · 8. confirmation communautaire · 9. expiration automatique · 10. filtres · 11. alertes simples · 12. profil · 13. hors connexion basique · 14. back-office de modération — plus Explorer, Autour de moi, notifications in-app, communauté, tableau de bord professionnel (version pilote), et le **module de navigation GPS sur les sentiers**, écran d'accueil de l'application (map matching, guidage pas à pas, sortie d'itinéraire, fil d'Ariane, alertes devant soi, GPX, hors connexion, import OpenStreetMap des chemins et itinéraires balisés — [NAVIGATION_GPS.md](NAVIGATION_GPS.md)).
 
 ## Prochaines étapes (par priorité)
 

@@ -1,9 +1,11 @@
 /**
  * Navigation temps réel sur les sentiers (module « Waze de la montagne »).
+ * C'est l'écran d'accueil de l'application (« Démarrer un itinéraire »).
  *
- * Trois états : préparation (activité, mode, itinéraire), activité en cours
- * (carte plein écran + affichage tête haute, marqueur rattaché au chemin,
- * fil d'Ariane, alertes devant soi, sortie d'itinéraire), résumé de fin.
+ * Trois états : accueil / préparation (dans la coquille, avec la barre de
+ * navigation), activité en cours (superposition plein écran au-dessus de la
+ * coquille : carte + affichage tête haute, marqueur rattaché au chemin, fil
+ * d'Ariane, alertes devant soi, sortie d'itinéraire), résumé de fin.
  * Le moteur tourne dans NavigationEngineHost : cet écran ne fait qu'afficher
  * et piloter (démarrer, pause, terminer, revenir sur ses pas, recentrer).
  *
@@ -12,12 +14,12 @@
  * ?speed=<m/s> et ?detour=1 (réglages de la simulation pour les tests).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { backtrackRoute, compassLabel, formatDistance, fr, interpolate, returnGuidance, routeFromTrail, type LatLng, type NavRoute } from "@mountain-live/core";
-import { Button, IconButton, Modal, PageLoader, TopBar, toast } from "@/components/ui";
+import { Button, Modal, PageLoader, toast } from "@/components/ui";
 import { MapView, isMapAlive } from "@/components/map/MapView";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -179,11 +181,13 @@ export default function NavigationPage() {
     const st = useNavigationStore.getState();
     st.finish(currentTrack());
     stopSpeaking();
+    // Les alertes de l'activité n'ont plus lieu d'être (et ne doivent pas recouvrir le résumé).
+    toast.clear();
     setStopConfirm(false);
   };
   const onDone = () => {
     useNavigationStore.getState().reset();
-    navigate("/map");
+    navigate("/navigate", { replace: true });
   };
   const onReport = () => navigate("/report", { state: { from: "/navigate" } });
 
@@ -192,16 +196,6 @@ export default function NavigationPage() {
   if (status === "idle" || status === "finished") {
     return (
       <div className="flex h-full min-h-0 flex-col bg-bg">
-        <TopBar
-          variant="solid"
-          title={status === "finished" ? fr.navigation.summaryTitle : fr.navigation.title}
-          subtitle={status === "finished" ? undefined : fr.navigation.subtitle}
-          leading={
-            <IconButton aria-label={fr.common.back} variant="ghost" onClick={() => (status === "finished" ? onDone() : navigate(-1))}>
-              <ArrowLeft />
-            </IconButton>
-          }
-        />
         <main className="min-h-0 flex-1 overflow-y-auto">
           {status === "finished" ? <NavSummary track={finalTrack ?? []} onDone={onDone} /> : <NavSetup presetRoute={presetRoute} presetMode={presetMode} presetSimulate={presetSimulate} onStart={(i) => void start(i)} />}
         </main>
@@ -209,8 +203,8 @@ export default function NavigationPage() {
     );
   }
 
-  return (
-    <div className="relative h-full min-h-0 w-full overflow-hidden bg-bg" data-testid="nav-page">
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-drawer)] overflow-hidden bg-bg" data-testid="nav-page">
       <MapView className="absolute inset-0" onReady={onReady} aria-label="Carte de navigation" minZoom={6} maxZoom={19}>
         <NavLayers route={route} returnTarget={returnTarget} />
       </MapView>
@@ -249,6 +243,7 @@ export default function NavigationPage() {
           </Button>
         </>
       } />
-    </div>
+    </div>,
+    document.body,
   );
 }

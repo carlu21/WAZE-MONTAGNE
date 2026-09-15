@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { OfflineBundle, PathSegment, Trail } from "@mountain-live/core";
+import type { NetworkStats, OfflineBundle, PathSegment, Trail, TrailSummary } from "@mountain-live/core";
 import { call, setup } from "./helpers";
-import { kindFromHighway, metaFromTags, overpassQuery, parseWidth, segmentsFromGeoJson, segmentsFromOverpass } from "../src/services/osm";
+import { chainWays, kindFromHighway, mergeParts, metaFromTags, overpassQuery, overpassRoutesQuery, parseWidth, routesFromOverpass, segmentsFromGeoJson, segmentsFromOverpass } from "../src/services/osm";
+import { upsertTrails } from "../src/services/reference";
 import { splitAtSharedNodes } from "../src/services/paths";
 
 const { app, seedReference } = await setup();
@@ -131,5 +132,81 @@ describe("Import OpenStreetMap", () => {
   it("coupe une boucle qui repasse par un de ses sommets", () => {
     const segs = splitAtSharedNodes([{ id: "loop", coordinates: [[9, 42], [9.001, 42], [9.001, 42.001], [9, 42.001], [9.001, 42], [9.002, 42]], meta: {} }]);
     expect(segs.map((s) => s.id)).toEqual(["loop_0", "loop_1", "loop_2"]);
+  });
+});
+
+describe("Import des itinéraires balisés (relations OSM)", () => {
+  const n = (id: number, lat: number, lon: number) => ({ type: "node", id, lat, lon });
+  const routes = {
+    elements: [
+      { type: "relation", id: 9000, tags: { type: "superroute", route: "hiking", name: "GR 20", ref: "GR 20", operator: "FFRandonnée" }, members: [{ type: "relation", ref: 9001, role: "" }, { type: "relation", ref: 9002, role: "" }] },
+      { type: "relation", id: 9001, tags: { type: "route", route: "hiking", name: "GR 20 — Étape 1", from: "Calenzana", to: "Ortu di u Piobbu", ascent: "1450 m" }, members: [{ type: "way", ref: 1, role: "" }, { type: "way", ref: 2, role: "" }, { type: "way", ref: 5, role: "alternative" }] },
+      { type: "relation", id: 9002, tags: { type: "route", route: "hiking", name: "GR 20 — Étape 2" }, members: [{ type: "way", ref: 3, role: "" }, { type: "way", ref: 4, role: "" }] },
+      { type: "relation", id: 9003, tags: { type: "route", route: "mtb", name: "Boucle VTT" }, members: [{ type: "way", ref: 6, role: "" }] },
+      { type: "relation", id: 9004, tags: { type: "route", route: "bus", name: "Ligne 3" }, members: [{ type: "way", ref: 1, role: "" }] },
+      // Étape 1 : chemins 1 puis 2 (le 2 est décrit à l'envers) ; étape 2 : 4 puis 3 (ordre inversé, raccordés par extrémités).
+      { type: "way", id: 1, nodes: [10, 11, 12], tags: { highway: "path", sac_scale: "mountain_hiking" } },
+      { type: "way", id: 2, nodes: [14, 13, 12], tags: { highway: "path", sac_scale: "demanding_mountain_hiking" } },
+      { type: "way", id: 3, nodes: [15, 16], tags: { highway: "path" } },
+      { type: "way", id: 4, nodes: [14, 15], tags: { highway: "path" } },
+      { type: "way", id: 5, nodes: [10, 20], tags: { highway: "path" } },
+      { type: "way", id: 6, nodes: [30, 31], tags: { highway: "track" } },
+      n(10, 42.5, 8.85), n(11, 42.49, 8.86), n(12, 42.48, 8.87), n(13, 42.47, 8.88), n(14, 42.46, 8.89), n(15, 42.45, 8.9), n(16, 42.44, 8.91), n(20, 42.51, 8.84), n(30, 42.3, 8.9), n(31, 42.31, 8.9),
+    ],
+  };
+
+  it("assemble les relations (et super-relations) en itinéraires continus", () => {
+    const trails = routesFromOverpass(routes as never, { minLengthM: 500 });
+    const ids = trails.map((t) => t.id);
+    expect(ids).toContain("osm_rel_9000");
+    expect(ids).toContain("osm_rel_9001");
+    expect(ids).toContain("osm_rel_9003");
+    expect(ids).not.toContain("osm_rel_9004");
+    const gr = trails.find((t) => t.id === "osm_rel_9000")!;
+    expect(gr.name).toBe("GR 20");
+    expect(gr.type).toBe("hiking");
+    expect(gr.difficulty).toBe("hard");
+    // 10 → 11 → 12 → 13 → 14 → 15 → 16 sans doublon ni saut.
+    expect(gr.geometry.coordinates).toHaveLength(7);
+    expect(gr.geometry.coordinates[0]).toEqual([8.85, 42.5]);
+    expect(gr.geometry.coordinates[6]).toEqual([8.91, 42.44]);
+    expect(gr.gaps).toBe(0);
+    expect(gr.distanceKm).toBeGreaterThan(8);
+    expect(gr.description).toContain("Balisage : FFRandonnée");
+    const e1 = trails.find((t) => t.id === "osm_rel_9001")!;
+    expect(e1.elevationGainM).toBe(1450);
+    expect(e1.geometry.coordinates).toHaveLength(5); // la variante (rôle alternative) est ignorée
+    expect(e1.description).toBe("Calenzana → Ortu di u Piobbu");
+    const vtt = trails.find((t) => t.id === "osm_rel_9003")!;
+    expect(vtt.type).toBe("mtb");
+    expect(vtt.difficulty).toBe("moderate");
+  });
+
+  it("enchaîne des tronçons dans le désordre et compte les écarts", () => {
+    const a: [number, number][] = [[9, 42], [9.001, 42]];
+    const b: [number, number][] = [[9.002, 42], [9.001, 42]];
+    const c: [number, number][] = [[9.01, 42], [9.011, 42]];
+    const parts = chainWays([c, a, b]);
+    expect(parts).toHaveLength(2);
+    const merged = mergeParts(parts);
+    expect(merged.gaps).toBe(1);
+    expect(merged.line[0]).toEqual([9.01, 42]);
+    expect(overpassRoutesQuery({ west: 9, south: 42, east: 9.1, north: 42.1 })).toContain('relation["type"~"^(route|superroute)$"]');
+  });
+
+  it("enregistre les itinéraires importés et les résume sans géométrie", async () => {
+    const trails = routesFromOverpass(routes as never, { minLengthM: 500 });
+    expect(upsertTrails(trails)).toBe(trails.length);
+    expect(upsertTrails(trails)).toBe(trails.length);
+    const res = await call<{ trails: TrailSummary[] }>(app, "GET", "/trails?bbox=8.8,42.4,9.0,42.6&summary=1");
+    const gr = res.body.trails.find((t) => t.id === "osm_rel_9000")!;
+    expect(gr).toBeDefined();
+    expect((gr as unknown as { geometry?: unknown }).geometry).toBeUndefined();
+    expect(gr.start).toEqual({ lng: 8.85, lat: 42.5 });
+    expect(gr.points).toBe(7);
+    const stats = await call<NetworkStats>(app, "GET", "/paths/stats");
+    expect(stats.body.trails.osm).toBeGreaterThanOrEqual(3);
+    expect(stats.body.paths.seed).toBeGreaterThan(0);
+    expect(stats.body.paths.osm).toBe(0);
   });
 });

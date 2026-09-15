@@ -55,7 +55,25 @@ if [ "${USERS_COUNT:-0}" -eq 0 ]; then
   $PNPM --filter @mountain-live/api db:reset || fail "La création de la base a échoué."
 fi
 
-# 5. Ouverture du navigateur dès que l'application répond
+# 5. Vrais sentiers et itinéraires (OpenStreetMap) : import en arrière-plan si la base n'en contient pas encore
+OSM_COUNT=0
+if [ -f "$DB_FILE" ]; then
+  OSM_COUNT=$(node -e "try{const D=require('./apps/api/node_modules/better-sqlite3');const db=new D(process.argv[1],{readonly:true});console.log(db.prepare(\"select count(*) as n from paths where source='osm'\").get().n)}catch(e){console.log(0)}" "$DB_FILE" 2>/dev/null || echo 0)
+fi
+if [ "${OSM_COUNT:-0}" -eq 0 ] && [ ! -f "apps/api/data/osm/.import-en-cours" ]; then
+  if curl -sf -m 10 "https://overpass-api.de/api/status" >/dev/null 2>&1; then
+    bold "Import des vrais sentiers et itinéraires de Corse (OpenStreetMap) en arrière-plan…"
+    echo "  Quelques minutes ; l'application reste utilisable. Journal : apps/api/data/osm/import.log"
+    mkdir -p apps/api/data/osm
+    touch apps/api/data/osm/.import-en-cours
+    ( $PNPM --filter @mountain-live/api geo:import-osm > apps/api/data/osm/import.log 2>&1; rm -f apps/api/data/osm/.import-en-cours ) &
+  else
+    echo "Pas de connexion à OpenStreetMap pour l'instant : les vrais sentiers seront importés au prochain lancement connecté"
+    echo "(ou par double-clic sur « Importer les sentiers (OpenStreetMap).command »)."
+  fi
+fi
+
+# 6. Ouverture du navigateur dès que l'application répond
 (
   for _ in $(seq 1 90); do
     if curl -sf http://localhost:5173/ >/dev/null 2>&1 && curl -sf http://localhost:8787/api/v1/health >/dev/null 2>&1; then

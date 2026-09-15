@@ -40,7 +40,7 @@ export function buildRoute(input: BuildRouteInput): NavRoute {
 
 export function routeFromTrail(trail: Pick<Trail, "id" | "name" | "geometry" | "elevationGainM">): NavRoute | null {
   if (trail.geometry.type !== "LineString" || trail.geometry.coordinates.length < 2) return null;
-  return buildRoute({ id: trail.id, name: trail.name, coordinates: trail.geometry.coordinates.map((c) => [c[0], c[1]]), elevationGainM: trail.elevationGainM, source: "trail" });
+  return buildRoute({ id: trail.id, name: trail.name, coordinates: trail.geometry.coordinates.map((c) => [c[0], c[1]]), elevationGainM: trail.elevationGainM > 0 ? trail.elevationGainM : null, source: "trail" });
 }
 
 /** Itinéraire inversé (retour au point de départ, section 8). */

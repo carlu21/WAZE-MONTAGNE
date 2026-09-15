@@ -12,6 +12,8 @@ export const qk = {
   areaSearch: (q: string) => ["areaSearch", q] as const,
   area: (id: string) => ["area", id] as const,
   trail: (id: string) => ["trail", id] as const,
+  trailSummaries: (bbox: BBox) => ["trailSummaries", [bbox.west, bbox.south, bbox.east, bbox.north].map((n) => n.toFixed(2)).join(",")] as const,
+  networkStats: ["networkStats"] as const,
   paths: (cell: string) => ["paths", cell] as const,
   trails: (bbox: BBox) => ["trails", [bbox.west, bbox.south, bbox.east, bbox.north].map((n) => n.toFixed(2)).join(",")] as const,
   waterPoints: (bbox: BBox) => ["waterPoints", [bbox.west, bbox.south, bbox.east, bbox.north].map((n) => n.toFixed(2)).join(",")] as const,

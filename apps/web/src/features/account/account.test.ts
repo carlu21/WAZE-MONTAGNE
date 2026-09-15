@@ -13,8 +13,8 @@ describe("compte", () => {
 
   it("redirige selon l'état de l'onboarding", () => {
     expect(splashTarget({ onboardingDone: false, hasToken: false })).toBe("/onboarding");
-    expect(splashTarget({ onboardingDone: true, hasToken: false })).toBe("/map");
-    expect(splashTarget({ onboardingDone: false, hasToken: true })).toBe("/map");
+    expect(splashTarget({ onboardingDone: true, hasToken: false })).toBe("/navigate");
+    expect(splashTarget({ onboardingDone: false, hasToken: true })).toBe("/navigate");
   });
 
   it("fusionne les filtres recommandés des pratiques", () => {

@@ -10,7 +10,7 @@ Module de suivi GPS et de guidage sur chemins, sentiers, pistes forestières et 
 | Données | `apps/api/src/services/paths.ts`, `osm.ts`, `db/demo-network.ts`, `db/import-osm.ts` | table `paths`, découpage aux intersections, import OpenStreetMap, réseau de démonstration |
 | Client | `apps/web/src/features/navigation/*`, `pages/NavigationPage.tsx` | sources de position, chargement du réseau par cellules, moteur temps réel, écran plein écran, couches carte, préparation, résumé |
 
-Écran : `/navigate` (plein écran, sans barre de navigation). Entrées : bouton « Navigation » sur la carte, entrée « Navigation » dans Explorer, bouton « Démarrer » sur chaque sentier d'une fiche de secteur, préférences (activité, précision, voix) dans Profil → Préférences.
+Écran : `/navigate`, **accueil de l'application** (onglet « Itinéraire ») : liste des itinéraires les plus proches avec recherche, import GPX, traces enregistrées, réglages repliés, « Démarrer » / « Explorer librement ». Pendant l'activité, l'écran passe en plein écran au-dessus de la coquille. Autres entrées : bouton « Navigation » sur la carte, entrée dans Explorer, « Démarrer » sur chaque sentier d'une fiche de secteur, préférences dans Profil → Préférences.
 
 Paramètres d'URL : `?trail=<id>` (itinéraire présélectionné), `?mode=free`, `?simulate=1` (GPS simulé), `?autostart=1`, `?speed=<m/s>`, `?detour=1` (tests).
 
@@ -93,7 +93,7 @@ Le suivi principal reste GPS/GNSS. `sources.ts` définit l'interface `PositionSo
 
 Table `paths` (`apps/api/src/db/schema.ts`) : géométrie, `kind` (path, track, footway, bridleway, cycleway, steps, road, via_ferrata), `name`, `surface`, `sac_scale`, `width_m`, `foot` / `bicycle` / `horse`, `ford`, `status` (fermeture temporaire), `elevations`, `source` (osm, ign, seed, gpx, local). Sources compatibles :
 
-- **OpenStreetMap** : `pnpm --filter @mountain-live/api geo:import-osm` (Overpass, Corse par dalles de 0,25°, cache `apps/api/data/osm/`), `-- --bbox`, `-- --file export.geojson|overpass.json`, ou double-clic sur `Importer les sentiers (OpenStreetMap).command`.
+- **OpenStreetMap** : `pnpm --filter @mountain-live/api geo:import-osm` (Overpass, Corse par dalles de 0,25°, cache `apps/api/data/osm/`), `-- --bbox`, `-- --file export.geojson|overpass.json`, `-- --routes-only` / `-- --paths-only`, ou double-clic sur `Importer les sentiers (OpenStreetMap).command`. `Lancer Mountain Live.command` déclenche cet import en arrière-plan au premier lancement connecté. Deux phases : le **réseau de chemins** (ways `highway=path|track|footway|bridleway|cycleway|steps|via_ferrata|…`, table `paths`) et les **itinéraires balisés** (relations `route=hiking|foot|mtb|horse|running` et super-relations : GR 20 et ses étapes, Mare a Mare, Mare e Monti, PR, boucles VTT), dont la géométrie est assemblée tronçon par tronçon (`chainWays` / `mergeParts`) et enregistrée dans `trails` (`osm_rel_<id>`), avec difficulté déduite de `sac_scale`, dénivelé de `ascent` quand il est renseigné. `db:reset` conserve ces données ; `GET /paths/stats` indique si la base ne contient que la démonstration (bandeau sur l'accueil).
 - **Traces GPX** : import à la préparation (référence de navigation), export en fin d'activité.
 - **IGN / bases locales / partenaires** : même table, `source` dédié ; l'API `GET /paths?bbox` et le bundle hors connexion ne changent pas.
 
@@ -118,6 +118,8 @@ Sans import, le jeu de démonstration installe un réseau densifié (sentiers de
 `/navigate?trail=t_restonica_melo&simulate=1&autostart=1` rejoue la Restonica avec un GPS simulé (bruit ± 6 m) : instruction, « Sur : Restonica », prochain événement (source signalée sèche), alertes par palier, arrivée, résumé. `&detour=1` provoque une sortie de parcours de 80 m entre 400 et 900 m. Le parcours de bout en bout (Chromium) vérifie préparation, suivi, arrivée, résumé, sortie / retour d'itinéraire, mode libre avec la géolocalisation du navigateur et les points d'entrée.
 
 ## Limites du prototype
+
+- L'environnement de développement distant n'a pas accès aux serveurs OpenStreetMap : les vraies géométries sont importées sur votre machine (automatiquement au lancement, ou par le lanceur d'import).
 
 - Les altitudes des sentiers de la base ne sont pas connues (pas de MNT) : « Forte pente » et dénivelés restants exacts n'existent que pour les GPX avec altitudes ; l'altitude affichée est celle du GPS.
 - Les chemins OSM sans `name` sont décrits par leur nature (« Sur un sentier »).

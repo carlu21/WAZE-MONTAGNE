@@ -12,7 +12,7 @@ import { authErrorMessage } from "@/features/account/authErrors";
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/map";
+  const from = (location.state as { from?: string } | null)?.from ?? "/navigate";
   const setSession = useSessionStore((s) => s.setSession);
   const setOnboardingDone = useSessionStore((s) => s.setOnboardingDone);
   const [email, setEmail] = useState("");
@@ -74,7 +74,7 @@ export default function LoginPage() {
         <Button type="submit" size="xl" fullWidth leftIcon={<LogIn />} loading={login.isPending}>
           {fr.auth.login}
         </Button>
-        <LinkButton to="/map" variant="ghost" size="lg" fullWidth onClick={() => setOnboardingDone(true)}>
+        <LinkButton to="/navigate" variant="ghost" size="lg" fullWidth onClick={() => setOnboardingDone(true)}>
           {fr.auth.continueAsGuest}
         </LinkButton>
         <p className="text-center text-[13px] text-muted">{fr.auth.guestHint}</p>

@@ -328,6 +328,20 @@ export interface Trail {
   description: string | null;
 }
 
+/** Sentier sans géométrie (listes) : point de départ et d'arrivée seulement. */
+export interface TrailSummary extends Omit<Trail, "geometry"> {
+  start: LatLng;
+  end: LatLng;
+  /** Nombre de sommets de la géométrie complète. */
+  points: number;
+}
+
+/** État du réseau de chemins : données de démonstration ou import réel. */
+export interface NetworkStats {
+  paths: { total: number; osm: number; seed: number };
+  trails: { total: number; osm: number };
+}
+
 export interface WaterPoint {
   id: string;
   name: string;

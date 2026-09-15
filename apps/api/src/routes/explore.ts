@@ -19,9 +19,9 @@ import { areaBBox, searchAreasWithFallback } from "../services/areas";
 import { listPathsInBBox, toPathSegment } from "../services/paths";
 import { HttpError } from "../services/errors";
 import { presenceEstimateInBBox } from "../services/presence";
-import { listOfficialAlerts, listTrailsInBBox, listWaterPointsInBBox, waterPointsAround } from "../services/reference";
+import { listOfficialAlerts, listTrailsInBBox, listWaterPointsInBBox, networkStats, waterPointsAround } from "../services/reference";
 import { listVisibleReports, serializeReports } from "../services/reports";
-import { toArea, toOfficialAlert, toTrail, toWaterPoint } from "../services/serializers";
+import { toArea, toOfficialAlert, toTrail, toTrailSummary, toWaterPoint } from "../services/serializers";
 
 /**
  * Autour de moi / explorer : /around, /areas/search, /areas/:id, /trails, /water-points, /alerts/official
@@ -91,9 +91,14 @@ exploreRoutes.get("/areas/:id", optionalAuth, (c) => {
 });
 
 exploreRoutes.get("/trails", (c) => {
-  const { bbox } = readQuery(c, bboxQuerySchema);
-  return c.json({ trails: listTrailsInBBox(bbox).map(toTrail) });
+  const { bbox, summary } = readQuery(c, z.object({ bbox: bboxStringSchema, summary: z.coerce.number().optional() }));
+  const rows = listTrailsInBBox(bbox);
+  if (summary) return c.json({ trails: rows.map(toTrailSummary) });
+  return c.json({ trails: rows.map(toTrail) });
 });
+
+/** Réseau de chemins : démonstration ou données réelles (bandeau d'invitation à l'import). */
+exploreRoutes.get("/paths/stats", (c) => c.json(networkStats()));
 
 exploreRoutes.get("/trails/:id", (c) => {
   const row = db.select().from(trails).where(eq(trails.id, c.req.param("id"))).get();

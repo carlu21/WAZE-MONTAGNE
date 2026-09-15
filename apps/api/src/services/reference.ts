@@ -1,7 +1,7 @@
 import { and, eq, gt, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { bboxFromCenter, haversineM, type BBox, type LatLng, type OfficialAlertInput, type ReportCategory } from "@mountain-live/core";
 import { db } from "../db/client";
-import { officialAlerts, trails, waterPoints, type OfficialAlertRow, type TrailRow, type WaterPointRow } from "../db/schema";
+import { officialAlerts, paths, trails, waterPoints, type OfficialAlertRow, type TrailRow, type WaterPointRow } from "../db/schema";
 import { geometryExtent, newId, nowIso } from "./util";
 
 /** Données de référence (sentiers, points d'eau) et alertes officielles. */
@@ -14,6 +14,48 @@ export function listTrailsInBBox(box: BBox): TrailRow[] {
       and(lte(trails.minLat, box.north), gte(trails.maxLat, box.south), lte(trails.minLng, box.east), gte(trails.maxLng, box.west)),
     )
     .all();
+}
+
+export interface TrailInput {
+  id: string;
+  name: string;
+  type: TrailRow["type"];
+  difficulty: TrailRow["difficulty"];
+  distanceKm: number;
+  elevationGainM: number;
+  geometry: TrailRow["geometry"];
+  description: string | null;
+}
+
+/** Insère ou met à jour des sentiers (import d'itinéraires). */
+export function upsertTrails(inputs: readonly TrailInput[]): number {
+  const now = nowIso();
+  let n = 0;
+  for (let i = 0; i < inputs.length; i += 200) {
+    const batch = inputs.slice(i, i + 200);
+    db.transaction((tx) => {
+      for (const t of batch) {
+        const { bbox } = geometryExtent(t.geometry);
+        const row = { id: t.id, name: t.name, type: t.type, difficulty: t.difficulty, distanceKm: t.distanceKm, elevationGainM: t.elevationGainM, geometry: t.geometry, minLat: bbox.south, minLng: bbox.west, maxLat: bbox.north, maxLng: bbox.east, description: t.description, createdAt: now };
+        tx.insert(trails)
+          .values(row)
+          .onConflictDoUpdate({ target: trails.id, set: { name: row.name, type: row.type, difficulty: row.difficulty, distanceKm: row.distanceKm, elevationGainM: row.elevationGainM, geometry: row.geometry, minLat: row.minLat, minLng: row.minLng, maxLat: row.maxLat, maxLng: row.maxLng, description: row.description } })
+          .run();
+        n++;
+      }
+    });
+  }
+  return n;
+}
+
+/** Statistiques du réseau (démonstration ou données réelles importées). */
+export function networkStats(): { paths: { total: number; osm: number; seed: number }; trails: { total: number; osm: number } } {
+  const bySource = db.select({ source: paths.source, n: sql<number>`count(*)` }).from(paths).groupBy(paths.source).all();
+  const count = (src: string): number => bySource.find((r) => r.source === src)?.n ?? 0;
+  const total = bySource.reduce((s, r) => s + r.n, 0);
+  const trailsTotal = db.select({ n: sql<number>`count(*)` }).from(trails).get()?.n ?? 0;
+  const trailsOsm = db.select({ n: sql<number>`count(*)` }).from(trails).where(sql`${trails.id} LIKE 'osm_rel_%'`).get()?.n ?? 0;
+  return { paths: { total, osm: count("osm"), seed: count("seed") }, trails: { total: trailsTotal, osm: trailsOsm } };
 }
 
 export function listWaterPointsInBBox(box: BBox): WaterPointRow[] {
