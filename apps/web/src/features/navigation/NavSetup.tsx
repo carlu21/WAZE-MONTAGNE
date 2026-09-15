@@ -168,7 +168,7 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
   const start = (mode: NavMode) => onStart({ mode, route: mode === "route" ? route : null, simulate: mode === "route" && simulate });
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-44 pt-3" data-testid="nav-setup">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-44" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }} data-testid="nav-setup">
       <header className="flex flex-col gap-1">
         <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-fg">{fr.navigation.homeTitle}</h1>
         <p className="text-[15px] text-muted">{fr.navigation.homeSubtitle}</p>

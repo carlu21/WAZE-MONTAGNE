@@ -4,6 +4,7 @@
  */
 import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/lib/portal";
 import { OctagonAlert, X } from "lucide-react";
 import { cn } from "./cn";
 import { IconButton } from "./Button";
@@ -112,7 +113,5 @@ export function Modal({
         {children ? <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">{children}</div> : null}
         {footer ? <div className="flex flex-col-reverse gap-2 px-5 pt-2 pb-5 sm:flex-row sm:justify-end">{footer}</div> : null}
       </div>
-    </div>,
-    document.body,
-  );
+    </div>, portalRoot());
 }

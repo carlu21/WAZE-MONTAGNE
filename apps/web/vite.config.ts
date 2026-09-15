@@ -2,12 +2,22 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import path from "node:path";
+
+/**
+ * HTTPS en développement (certificat auto-signé) : indispensable pour ouvrir
+ * l'application sur un téléphone du même réseau — géolocalisation, boussole et
+ * caméra exigent un contexte sécurisé hors localhost. MOUNTAIN_LIVE_HTTP=1
+ * revient au HTTP simple (tests automatisés, dépannage).
+ */
+const useHttps = process.env.MOUNTAIN_LIVE_HTTP !== "1";
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    ...(useHttps ? [basicSsl({ name: "mountain-live", domains: ["localhost", "127.0.0.1", "*.local"] })] : []),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icons/*.svg", "icons/*.png"],
@@ -78,6 +88,7 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   server: {
     port: 5173,
+    host: true,
     proxy: {
       // API et photos (photoUrl / photos[].url sont des chemins relatifs « /uploads/… » servis par l'API).
       "/api": { target: "http://localhost:8787", changeOrigin: true },

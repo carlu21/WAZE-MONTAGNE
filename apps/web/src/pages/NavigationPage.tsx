@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/lib/portal";
 import { useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { Map as MaplibreMap } from "maplibre-gl";
@@ -243,7 +244,5 @@ export default function NavigationPage() {
           </Button>
         </>
       } />
-    </div>,
-    document.body,
-  );
+    </div>, portalRoot());
 }

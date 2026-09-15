@@ -6,6 +6,13 @@
 - **iOS (Safari)** : Partager → « Sur l'écran d'accueil ». Le service worker, la géolocalisation et la caméra fonctionnent ; les notifications système nécessitent iOS 16.4+ et l'installation sur l'écran d'accueil.
 - Le site doit être servi en **HTTPS** (géolocalisation, caméra, service worker).
 
+## Tester sur votre iPhone (application smartphone uniquement)
+
+- L'application est conçue pour smartphone : sur un écran d'ordinateur, elle s'affiche dans un **cadre d'iPhone** (390 × 844, barre d'état, îlot dynamique, zones sûres) avec, à côté, l'adresse réseau et un **QR code**. `?frame=0` affiche l'application en plein écran ; le cadre disparaît de lui-même sur un vrai téléphone ou en mode installé.
+- `Lancer Mountain Live.command` sert l'application en **HTTPS** (certificat auto-signé, plugin Vite basic-ssl) : c'est ce qui permet au GPS, à la boussole et à la caméra de fonctionner sur un téléphone du même Wi-Fi (`https://<adresse-du-mac>:5173`, affichée dans le Terminal et dans le panneau QR).
+- Sur l'iPhone, Safari affiche un avertissement la première fois : « Afficher les détails » → « visiter ce site web ». Puis Partager → « Sur l'écran d'accueil ». Avec ce certificat non reconnu, le service worker (mode hors connexion) n'est pas activé sur iOS ; le reste fonctionne. En production, un certificat valide lève cette limite.
+- `MOUNTAIN_LIVE_HTTP=1 pnpm dev` revient au HTTP simple (tests automatisés, dépannage).
+
 ## Permissions et usage en extérieur
 
 | Sujet | Mise en œuvre |

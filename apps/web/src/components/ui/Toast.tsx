@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/lib/portal";
 import { CircleCheck, Info, OctagonAlert, TriangleAlert, X } from "lucide-react";
 import { toast, useToasts, type ToastApi, type ToastItem, type ToastTone } from "@/lib/toast";
 import { cn } from "./cn";
@@ -109,9 +110,7 @@ export function ToastViewport() {
           <ToastCard key={item.id} item={item} />
         ))}
       </div>
-    </div>,
-    document.body,
-  );
+    </div>, portalRoot());
 }
 
 export interface ToastProviderProps {

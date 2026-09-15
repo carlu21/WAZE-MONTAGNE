@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -27,6 +28,23 @@ import { HttpError } from "./services/errors";
  * Application Hono : migrations au démarrage, CORS, journalisation, fichiers envoyés
  * servis sous /uploads, routes métier sous /api/v1, erreurs JSON uniformes.
  */
+/** Adresses IPv4 non locales de la machine (Wi-Fi, Ethernet), les réseaux privés d'abord. */
+export function lanAddresses(): string[] {
+  const out: string[] = [];
+  try {
+    for (const list of Object.values(os.networkInterfaces())) {
+      for (const i of list ?? []) {
+        if (i.family !== "IPv4" || i.internal) continue;
+        out.push(i.address);
+      }
+    }
+  } catch {
+    /* interfaces indisponibles */
+  }
+  const priv = (a: string) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a);
+  return out.sort((a, b) => Number(priv(b)) - Number(priv(a)));
+}
+
 export function createApp() {
   runMigrations(sqlite);
   fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -56,7 +74,8 @@ export function createApp() {
   );
 
   const api = new Hono<AppEnv>();
-  api.get("/health", (c) => c.json({ ok: true, time: new Date().toISOString() }));
+  // `lan` : adresses IPv4 de la machine (ouvrir l'application sur un téléphone du même réseau).
+  api.get("/health", (c) => c.json({ ok: true, time: new Date().toISOString(), lan: lanAddresses() }));
   api.get("/taxonomy", (c) => c.json({ categories: CATEGORIES, subtypes: SUBTYPES }));
 
   api.route("/auth", authRoutes);

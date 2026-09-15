@@ -73,11 +73,19 @@ if [ "${OSM_COUNT:-0}" -eq 0 ] && [ ! -f "apps/api/data/osm/.import-en-cours" ];
   fi
 fi
 
-# 6. Ouverture du navigateur dès que l'application répond
+# 6. Adresse pour votre iPhone (même Wi-Fi) : l'application est servie en HTTPS (certificat auto-signé,
+#    à accepter une fois dans Safari : « Afficher les détails » → « visiter ce site web »).
+LAN_IP=""
+for IF in en0 en1 en2 en3; do
+  LAN_IP=$(ipconfig getifaddr "$IF" 2>/dev/null) && [ -n "$LAN_IP" ] && break
+done
+[ -z "$LAN_IP" ] && LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+
+# 7. Ouverture du navigateur dès que l'application répond
 (
   for _ in $(seq 1 90); do
-    if curl -sf http://localhost:5173/ >/dev/null 2>&1 && curl -sf http://localhost:8787/api/v1/health >/dev/null 2>&1; then
-      command -v open >/dev/null 2>&1 && open "http://localhost:5173"
+    if curl -skf https://localhost:5173/ >/dev/null 2>&1 && curl -sf http://localhost:8787/api/v1/health >/dev/null 2>&1; then
+      command -v open >/dev/null 2>&1 && open "https://localhost:5173"
       exit 0
     fi
     sleep 1
@@ -85,7 +93,11 @@ fi
 ) &
 
 bold "Démarrage de l'application…"
-echo "  Web : http://localhost:5173   API : http://localhost:8787"
+echo "  Sur cet ordinateur : https://localhost:5173  (vue iPhone avec QR code à côté)"
+if [ -n "$LAN_IP" ]; then
+  echo "  Sur votre iPhone   : https://$LAN_IP:5173  (même Wi-Fi ; acceptez le certificat une fois, puis Partager → Sur l'écran d'accueil)"
+fi
+echo "  API : http://localhost:8787"
 echo "  Comptes de démo : rando@mountain-live.demo / demo1234 (admin@… pour le back-office)"
 echo "  Pour arrêter : Ctrl + C"
 echo

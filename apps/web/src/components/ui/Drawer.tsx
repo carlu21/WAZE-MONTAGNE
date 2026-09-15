@@ -3,6 +3,7 @@
  */
 import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/lib/portal";
 import { X } from "lucide-react";
 import { cn } from "./cn";
 import { IconButton } from "./Button";
@@ -90,7 +91,5 @@ export function Drawer({
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">{children}</div>
         {footer ? <div className="border-t border-line px-4 py-3">{footer}</div> : null}
       </div>
-    </div>,
-    document.body,
-  );
+    </div>, portalRoot());
 }

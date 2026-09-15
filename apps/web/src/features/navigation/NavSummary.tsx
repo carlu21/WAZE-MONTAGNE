@@ -32,7 +32,7 @@ export function NavSummary({ track, onDone }: NavSummaryProps) {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-10 pt-3" data-testid="nav-summary">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 pb-10" style={{ paddingTop: "calc(var(--safe-top) + 12px)" }} data-testid="nav-summary">
       <h2 className="text-[22px] font-bold text-fg">{fr.navigation.summaryTitle}</h2>
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3">
         <Stat value={formatDistance(stats.distanceM)} label={fr.navigation.stats.distance} tone="primary" />

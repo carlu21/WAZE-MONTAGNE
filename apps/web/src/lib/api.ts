@@ -103,7 +103,7 @@ const q = (params: Record<string, string | number | boolean | undefined | null>)
 };
 
 export const api = {
-  health: () => request<{ ok: boolean; time: string }>("GET", "/health"),
+  health: () => request<{ ok: boolean; time: string; lan?: string[] }>("GET", "/health"),
 
   auth: {
     register: (input: RegisterInput) => request<AuthResponse>("POST", "/auth/register", input),

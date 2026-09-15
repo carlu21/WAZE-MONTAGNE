@@ -111,8 +111,19 @@ export function useMediaQuery(query: string): boolean {
 
 /** Point de rupture « écran large » où la barre basse devient une barre latérale. */
 export const DESKTOP_QUERY = "(min-width: 1024px)";
+export const PHONE_FRAME_QUERY = "(min-width: 600px) and (min-height: 560px)";
+/**
+ * Application conçue pour smartphone uniquement : sur grand écran, elle
+ * s'affiche dans un cadre de téléphone (PhoneFrame) et garde la disposition
+ * mobile. La mise en page « bureau » (barre latérale) est donc désactivée.
+ */
 export function useIsDesktop(): boolean {
-  return useMediaQuery(DESKTOP_QUERY);
+  return false;
+}
+
+/** Grand écran : le cadre de téléphone est affiché autour de l'application. */
+export function useShowPhoneFrame(): boolean {
+  return useMediaQuery(PHONE_FRAME_QUERY);
 }
 
 export function usePrefersReducedMotion(): boolean {

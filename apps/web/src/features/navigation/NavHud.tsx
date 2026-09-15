@@ -74,6 +74,11 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
               <span className="truncate">{interpolate(fr.navigation.events.infoIn, { label: nextEvent.event.label, distance: formatDistance(nextEvent.distanceM) })}</span>
             </span>
           ) : null}
+          {live.altitude !== null ? (
+            <span className="glass inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-semibold text-fg" data-testid="nav-altitude">
+              {fr.navigation.stats.altitude} {altText}
+            </span>
+          ) : null}
           {session?.simulate ? <span className="glass inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-semibold text-info">{fr.navigation.simulating}</span> : null}
         </div>
         {quality === "poor" || quality === "lost" ? (
@@ -99,11 +104,11 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
       {/* Barre basse : statistiques */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[var(--z-overlay)] px-3" style={{ paddingBottom: "calc(var(--safe-bottom) + 12px)" }}>
         <div className="glass-strong pointer-events-auto mx-auto flex max-w-xl items-center gap-2 rounded-2xl px-3 py-2 shadow-lg" data-testid="nav-stats">
-          <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
+          {/* Trois valeurs : lisibles d'un coup d'œil sur un écran de 390 px (l'altitude est une puce en haut). */}
+          <div className="grid min-w-0 flex-1 grid-cols-3 gap-1">
             {route && progress ? (
               <>
                 <StatCell label={fr.navigation.stats.remaining} value={formatDistance(progress.remainingM)} />
-                <StatCell label={fr.navigation.stats.altitude} value={altText} />
                 <StatCell label={fr.navigation.stats.speed} value={formatSpeedKmh(movingSpeedMs)} />
                 <StatCell label={fr.navigation.stats.eta} value={eta ? `${formatClock(eta.arrivalAt)}` : "—"} sub={eta ? formatDurationShort(eta.remainingMs) : undefined} />
               </>
@@ -111,7 +116,6 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
               <>
                 <StatCell label={fr.navigation.stats.distance} value={formatDistance(stats?.distanceM ?? 0)} />
                 <StatCell label={fr.navigation.stats.duration} value={formatDurationShort(stats?.durationMs ?? 0)} />
-                <StatCell label={fr.navigation.stats.altitude} value={altText} />
                 <StatCell label={fr.navigation.stats.speed} value={formatSpeedKmh(movingSpeedMs)} />
               </>
             )}
@@ -131,7 +135,7 @@ export function NavHud({ route, returnGuidanceText, onRecenter, onReport, onBack
 function StatCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="flex min-w-0 flex-col items-center text-center">
-      <span className="tabular w-full truncate whitespace-nowrap text-[15px] font-bold leading-tight text-fg">{value}</span>
+      <span className="tabular w-full truncate whitespace-nowrap text-[16px] font-bold leading-tight text-fg">{value}</span>
       {sub ? <span className="text-[11px] leading-none text-muted">{sub}</span> : null}
       <span className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-muted">{label}</span>
     </div>

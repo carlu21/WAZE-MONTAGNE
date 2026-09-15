@@ -22,6 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/lib/portal";
 import { X } from "lucide-react";
 import { cn } from "./cn";
 import { IconButton } from "./Button";
@@ -450,7 +451,5 @@ export function BottomSheet({
         </div>
         {footer ? <div className="shrink-0 border-t border-line bg-surface px-4 py-3">{footer}</div> : null}
       </div>
-    </div>,
-    document.body,
-  );
+    </div>, portalRoot());
 }

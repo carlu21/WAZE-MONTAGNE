@@ -10,7 +10,7 @@ Les applications classiques répondent à « Où puis-je aller ? ». Mountain Li
 
 ## Démarrage rapide
 
-**Sur Mac, sans ligne de commande** : double-cliquez sur `Lancer Mountain Live.command` dans le Finder. Le Terminal s'ouvre, installe ce qu'il faut au premier lancement (Node.js 20+ doit être installé : [nodejs.org](https://nodejs.org/fr/download)), démarre l'application et ouvre le navigateur. `Reinitialiser les donnees.command` remet le jeu de données de démonstration à zéro ; `Importer les lieux-dits (GeoNames).command` et `Importer les sentiers (OpenStreetMap).command` enrichissent la base (lieux-dits, réseau de sentiers). Si macOS refuse d'ouvrir le fichier, clic droit → Ouvrir, ou dans le Terminal : `chmod +x *.command`.
+**Sur Mac, sans ligne de commande** : double-cliquez sur `Lancer Mountain Live.command` dans le Finder. Le Terminal s'ouvre, installe ce qu'il faut au premier lancement (Node.js 20+ doit être installé : [nodejs.org](https://nodejs.org/fr/download)), démarre l'application (HTTPS) et ouvre le navigateur : l'application, conçue pour smartphone, s'y affiche dans un cadre d'iPhone avec un QR code pour l'ouvrir sur votre vrai téléphone (même Wi-Fi ; voir [docs/MOBILE.md](docs/MOBILE.md)). `Reinitialiser les donnees.command` remet le jeu de données de démonstration à zéro ; `Importer les lieux-dits (GeoNames).command` et `Importer les sentiers (OpenStreetMap).command` enrichissent la base (lieux-dits, réseau de sentiers). Si macOS refuse d'ouvrir le fichier, clic droit → Ouvrir, ou dans le Terminal : `chmod +x *.command`.
 
 Prérequis en ligne de commande : Node.js ≥ 20 et pnpm 10 (`corepack enable`).
 
