@@ -3,7 +3,7 @@
  * au panneau « Randonnées autour de vous ».
  */
 import type { LngLat } from "../geo";
-import type { PathSource } from "../navigation/types";
+import type { TrailSource } from "../navigation/types";
 import type { NearbySort, NearbyTrail } from "./types";
 
 export interface NearbyRequest {
@@ -33,12 +33,28 @@ export interface TrailGeometryResponse {
   coordinates: LngLat[];
   elevations: number[] | null;
   /**
-   * Provenance du tracé : `osm`, `ign` ou `gpx` = relevé réel ; `seed` ou
+   * Provenance de la GÉOMÉTRIE renvoyée — la moins fiable de ses composants.
+   * `osm`, `ign`, `gpx`, `official`, `partner` = relevé réel ; `seed` ou
    * `local` = démonstration ou brouillon. `null` quand elle est inconnue.
    * L'affichage refuse de présenter comme itinéraire un tracé non relevé
    * (`routeVerdict`) : une jolie ligne sur des données fictives reste fictive.
    */
-  source: PathSource | null;
+  source: TrailSource | null;
+  /** Provenance de l'ITINÉRAIRE lui-même, indépendamment de ses segments. */
+  trailSource: TrailSource | null;
+  /**
+   * D'où vient la géométrie renvoyée :
+   *  - `segments` : reconstruite depuis le réseau navigable — elle suit par
+   *    construction des chemins qui existent ;
+   *  - `trail` : le tracé stocké de l'itinéraire, faute de segments associés.
+   */
+  geometryFrom: "segments" | "trail";
+  /** Segments composant l'itinéraire (0 si aucun n'est associé). */
+  segmentCount: number;
+  /** Part des membres (ou du tracé) retrouvée dans le réseau, 0..1. */
+  linkCoverage: number | null;
+  /** Confiance dans la géométrie (0..1) : couverture pénalisée par les ruptures. */
+  geometryConfidence: number | null;
   /** Longueur annoncée par la fiche (m) : sert à repérer un tracé qui coupe au plus court. */
   declaredLengthM: number | null;
 }

@@ -3,7 +3,7 @@
  * Ce fichier est LE contrat : toute évolution ici doit être répercutée
  * côté API (schéma / routes) et côté web (client / UI).
  */
-import type { PathSegment } from "./navigation/types";
+import type { PathSegment, TrailSource } from "./navigation/types";
 
 /** Catégories principales de signalement (section 4 du cahier des charges). */
 export type ReportCategory =
@@ -335,6 +335,12 @@ export interface Trail {
   elevationGainM: number;
   geometry: GeoJsonGeometry; // LineString
   description: string | null;
+  /**
+   * Provenance de l'itinéraire, enregistrée à l'import — jamais déduite du
+   * préfixe de l'identifiant. `null` pour les lignes antérieures à la
+   * migration 6, traitées comme de provenance inconnue (donc non affichables).
+   */
+  source: TrailSource | null;
 }
 
 /** Sentier sans géométrie (listes) : point de départ et d'arrivée seulement. */
@@ -346,9 +352,42 @@ export interface TrailSummary extends Omit<Trail, "geometry"> {
 }
 
 /** État du réseau de chemins : données de démonstration ou import réel. */
+/** Décompte par provenance. Toute source absente vaut 0 — jamais « inconnu ». */
+export interface SourceCounts {
+  total: number;
+  osm: number;
+  ign: number;
+  gpx: number;
+  seed: number;
+  local: number;
+  /** Itinéraires seulement : publiés par une collectivité ou un partenaire. */
+  official?: number;
+  partner?: number;
+  /** Lignes dont la provenance n'a pas été enregistrée : un défaut, pas une catégorie. */
+  unknown: number;
+}
+
+/**
+ * Santé du réseau cartographique. Sert à répondre à une seule question, qui
+ * doit rester vérifiable d'un coup d'œil : l'application travaille-t-elle sur
+ * des données réelles, ou sur sa démonstration ?
+ */
 export interface NetworkStats {
-  paths: { total: number; osm: number; seed: number };
-  trails: { total: number; osm: number };
+  paths: SourceCounts;
+  trails: SourceCounts;
+  links: {
+    /** Lignes de `trail_segments` : associations randonnée ↔ segment. */
+    trailSegments: number;
+    /** Randonnées ayant au moins un segment associé. */
+    linkedTrails: number;
+    /** Randonnées relevées sans aucun segment associé : import incomplet. */
+    orphanTrails: number;
+  };
+  /**
+   * `true` dès qu'un réseau réellement relevé est disponible. Le frontend s'en
+   * sert pour ne jamais laisser croire que la démonstration est du terrain.
+   */
+  realDataReady: boolean;
 }
 
 export interface WaterPoint {

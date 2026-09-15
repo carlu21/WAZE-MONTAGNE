@@ -475,11 +475,28 @@ const SORT_COMPARATORS: Record<NearbySort, TrailComparator> = {
  * Le tableau d'entrée n'est jamais modifié ; un nouveau tableau est renvoyé.
  * Aucun itinéraire n'est écarté : filtrer est le travail de l'appelant.
  */
+/**
+ * Rang de confiance dans la donnée : plus c'est petit, plus on l'affiche haut.
+ *
+ *   0  navigable    — relevé, détaillé, rattaché au réseau
+ *   1  affichable   — relevé mais incomplètement rattaché
+ *   2  reste        — démonstration, provenance inconnue, tracé schématique
+ *
+ * Ce rang PRIME sur le critère de tri demandé : une randonnée de démonstration
+ * n'est jamais « la plus proche » devant une vraie, sinon la liste ferait
+ * passer le jeu de test pour du terrain (section 29).
+ */
+function dataRank(trail: NearbyTrail): number {
+  if (trail.navigable) return 0;
+  if (trail.drawable) return 1;
+  return 2;
+}
+
 export function rankNearby(trails: readonly NearbyTrail[], sort: NearbySort): NearbyTrail[] {
   const primary = SORT_COMPARATORS[sort] ?? SORT_COMPARATORS.closest;
   const ranked = trails.slice();
   ranked.sort(
-    (a, b) => primary(a, b) || ascending(a.approachM, b.approachM) || compareIds(a.id, b.id),
+    (a, b) => ascending(dataRank(a), dataRank(b)) || primary(a, b) || ascending(a.approachM, b.approachM) || compareIds(a.id, b.id),
   );
   return ranked;
 }

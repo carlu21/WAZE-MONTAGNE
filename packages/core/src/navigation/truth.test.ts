@@ -9,11 +9,14 @@ import {
   directionIndicator,
   drawableTraceSegments,
   geometryFidelity,
+  NAVIGABLE_MIN_COVERAGE,
   isSurveyed,
   positionTrust,
   routeVerdict,
   splitTrace,
+  trailUsability,
   trailVerdict,
+  weakestSource,
 } from "./truth";
 import type { LngLat } from "../geo";
 import type { TrackPoint } from "./types";
@@ -233,5 +236,51 @@ describe("découpage de la trace brute", () => {
   it("supporte une trace vide", () => {
     expect(splitTrace([]).segments).toHaveLength(0);
     expect(drawableTraceSegments([])).toHaveLength(0);
+  });
+});
+
+describe("affichable et navigable", () => {
+  const detailed = line(20, 60);
+
+  it("refuse tout d'un tracé non relevé", () => {
+    const u = trailUsability({ coordinates: detailed, source: "seed", linkCoverage: 1, segmentCount: 40 });
+    expect(u.drawable).toBe(false);
+    expect(u.navigable).toBe(false);
+    expect(u.refusal).toBe("not_surveyed");
+  });
+
+  it("autorise le guidage sur un tracé relevé et bien rattaché", () => {
+    const u = trailUsability({ coordinates: detailed, source: "osm", linkCoverage: 1, segmentCount: 40 });
+    expect(u.drawable).toBe(true);
+    expect(u.navigable).toBe(true);
+    expect(u.partial).toBe(false);
+  });
+
+  it("montre mais ne guide pas un tracé partiellement rattaché", () => {
+    const u = trailUsability({ coordinates: detailed, source: "osm", linkCoverage: 0.67, segmentCount: 20 });
+    expect(u.drawable).toBe(true);
+    expect(u.partial).toBe(true);
+    expect(u.navigable).toBe(false);
+  });
+
+  it("ne réclame pas une couverture parfaite", () => {
+    expect(trailUsability({ coordinates: detailed, source: "osm", linkCoverage: NAVIGABLE_MIN_COVERAGE, segmentCount: 20 }).navigable).toBe(true);
+    expect(trailUsability({ coordinates: detailed, source: "osm", linkCoverage: NAVIGABLE_MIN_COVERAGE - 0.01, segmentCount: 20 }).navigable).toBe(false);
+  });
+
+  it("ne pénalise pas une géométrie qui n'a jamais été rattachée", () => {
+    // Relation OSM détaillée, sans segments associés : la couverture n'a pas de
+    // sens ici, et l'absence de mesure ne vaut pas mesure mauvaise.
+    const u = trailUsability({ coordinates: detailed, source: "osm", linkCoverage: null, segmentCount: 0 });
+    expect(u.navigable).toBe(true);
+    expect(u.partial).toBe(false);
+  });
+
+  it("range official et partner parmi les provenances relevées", () => {
+    expect(isSurveyed("official")).toBe(true);
+    expect(isSurveyed("partner")).toBe(true);
+    expect(weakestSource(["osm", "official"])).toBe("osm");
+    expect(weakestSource(["osm", "seed"])).toBe("seed");
+    expect(weakestSource([])).toBeNull();
   });
 });

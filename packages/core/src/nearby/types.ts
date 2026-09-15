@@ -17,7 +17,7 @@
  *    veut pas dire que personne n'y passe.
  */
 import type { LatLng } from "../types";
-import type { ActivityMode } from "../navigation/types";
+import type { ActivityMode, TrailSource } from "../navigation/types";
 import type { FrequentationLevel } from "../network/types";
 
 /** Forme d'un itinéraire (section 37) : elle change la façon de le lire. */
@@ -91,6 +91,17 @@ export interface NearbyTrail {
   popularityScore: number | null;
 
   /** Signalements actifs sur l'itinéraire (section 20). */
+  /**
+   * Provenance de l'itinéraire. `seed` = démonstration : la fiche le dit, et
+   * l'application ne propose pas de la suivre.
+   */
+  source: TrailSource | null;
+  /** Le tracé décrit un chemin réel et peut être dessiné. */
+  drawable: boolean;
+  /** Un guidage peut être lancé dessus (couverture du réseau suffisante). */
+  navigable: boolean;
+  /** Dessinable mais incomplètement rattaché : « Tracé partiellement vérifié ». */
+  partial: boolean;
   activeReports: number;
   /** Phrase courte prête à afficher (« Battue signalée »), ou null. */
   reportHint: string | null;

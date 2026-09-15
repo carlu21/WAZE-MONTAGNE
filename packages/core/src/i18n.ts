@@ -529,6 +529,9 @@ export const fr = {
       noNetwork: "Aucun chemin connu dans ce secteur : le réseau réel n'y est pas encore importé.",
       unreachable: "Aucun chemin connu ne relie ces deux points.",
       searching: "Recherche d'un itinéraire sur les chemins réels…",
+      /** Le tracé est réel, mais une part n'est rattachée à aucun chemin connu. */
+      partial: "Tracé partiellement vérifié : une partie du parcours n'est rattachée à aucun chemin connu. Le guidage n'est pas proposé sur ce tracé.",
+      partialShort: "Tracé partiellement vérifié",
     },
     /** Un seul message d'état GPS : il disparaît dès que le signal est bon. */
     gpsAcquiring: "Acquisition GPS…",

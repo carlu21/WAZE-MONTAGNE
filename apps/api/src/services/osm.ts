@@ -3,8 +3,8 @@
  * segments du réseau de chemins. Règles d'accès par défaut selon `highway`,
  * affinées par les tags `foot`, `bicycle`, `horse`, `access`, `ford`, etc.
  */
-import type { LngLat, PathKind, PathSegment } from "@mountain-live/core";
-import { splitAtSharedNodes, type RawWay } from "./paths";
+import type { LngLat, PathKind, PathSegment, TrailSource } from "@mountain-live/core";
+import { osmFeatureId, splitAtSharedNodes, type RawWay } from "./paths";
 
 export interface OverpassNode {
   type: "node";
@@ -113,7 +113,9 @@ export function segmentsFromOverpass(json: OverpassJson): PathSegment[] {
       if (c) coordinates.push(c);
     }
     if (coordinates.length < 2) continue;
-    raw.push({ id: `osm_${w.id}`, coordinates, meta: metaFromTags(tags) });
+    // `sourceFeatureId` survit au découpage aux intersections : c'est par lui
+    // qu'une relation retrouvera ses segments, quel qu'en soit le nombre.
+    raw.push({ id: `osm_${w.id}`, coordinates, meta: { ...metaFromTags(tags), sourceFeatureId: osmFeatureId(w.id) } });
   }
   return splitAtSharedNodes(raw);
 }
@@ -139,7 +141,11 @@ export function segmentsFromGeoJson(json: { type: string; features?: GeoJsonFeat
       const coordinates = (line as number[][]).filter((c) => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1])).map((c) => [c[0], c[1]] as LngLat);
       if (coordinates.length < 2) continue;
       const base = tags["@id"] ?? tags.id ?? (f.id !== undefined ? String(f.id) : null);
-      raw.push({ id: base ? `osm_${String(base).replace(/^way\//, "")}${lines.length > 1 ? `_${n}` : ""}` : `geo_${n}`, coordinates, meta: metaFromTags(tags) });
+      raw.push({
+        id: base ? `osm_${String(base).replace(/^way\//, "")}${lines.length > 1 ? `_${n}` : ""}` : `geo_${n}`,
+        coordinates,
+        meta: { ...metaFromTags(tags), sourceFeatureId: base ? osmFeatureId(String(base)) : null },
+      });
       n++;
     }
   }
@@ -175,6 +181,18 @@ export interface ImportedTrail {
   description: string | null;
   /** Nombre de tronçons non raccordés (qualité de la donnée). */
   gaps: number;
+  /**
+   * Provenance, portée explicitement depuis l'import. Toujours `"osm"` ici :
+   * elle est écrite en base telle quelle, jamais redéduite d'un préfixe
+   * d'identifiant plus tard dans la chaîne.
+   */
+  source: TrailSource;
+  /**
+   * Identifiants des ways OpenStreetMap composant la relation, dans l'ordre de
+   * visite et dédoublonnés. C'est la matière première de `trail_segments` :
+   * sans eux, on saurait qu'une randonnée existe sans savoir par où elle passe.
+   */
+  memberWayIds: number[];
 }
 
 const ROUTE_TYPES: Record<string, ImportedTrail["type"]> = { hiking: "hiking", foot: "hiking", running: "trail", mtb: "mtb", horse: "equestrian" };
@@ -303,17 +321,32 @@ export function routesFromOverpass(json: OverpassJson, opts: { minLengthM?: numb
     if (entry && entry.coords.length < w.nodes.length) entry.coords = w.nodes.map((id) => nodes.get(id)).filter((c): c is LngLat => Boolean(c));
   }
 
-  const collect = (rel: OverpassRelation, visited: Set<number>, out: { coords: LngLat[]; tags: Record<string, string> }[]): void => {
+  /*
+   * Visite récursive : une `superroute` contient d'autres relations (le GR20
+   * complet contient ses étapes). `visited` empêche de repasser sur la même
+   * relation, `seenWays` d'ajouter deux fois le même way — un tronçon partagé
+   * par deux étapes voisines était compté double, et gonflait la longueur.
+   */
+  const collect = (
+    rel: OverpassRelation,
+    visited: Set<number>,
+    seenWays: Set<number>,
+    out: { coords: LngLat[]; tags: Record<string, string>; wayId: number }[],
+  ): void => {
     if (visited.has(rel.id)) return;
     visited.add(rel.id);
     for (const m of rel.members ?? []) {
       if (m.role && SKIP_ROLES.test(m.role)) continue;
       if (m.type === "way") {
+        if (seenWays.has(m.ref)) continue;
         const w = ways.get(m.ref);
-        if (w && w.coords.length >= 2) out.push(w);
+        if (w && w.coords.length >= 2) {
+          seenWays.add(m.ref);
+          out.push({ ...w, wayId: m.ref });
+        }
       } else if (m.type === "relation") {
         const sub = relations.get(m.ref);
-        if (sub) collect(sub, visited, out);
+        if (sub) collect(sub, visited, seenWays, out);
       }
     }
   };
@@ -323,8 +356,8 @@ export function routesFromOverpass(json: OverpassJson, opts: { minLengthM?: numb
     const tags = rel.tags ?? {};
     const type = ROUTE_TYPES[tags.route ?? ""];
     if (!type || !(tags.type === "route" || tags.type === "superroute")) continue;
-    const members: { coords: LngLat[]; tags: Record<string, string> }[] = [];
-    collect(rel, new Set(), members);
+    const members: { coords: LngLat[]; tags: Record<string, string>; wayId: number }[] = [];
+    collect(rel, new Set(), new Set(), members);
     if (members.length === 0) continue;
     const parts = chainWays(members.map((m) => m.coords));
     const { line, gaps } = mergeParts(parts);
@@ -343,6 +376,8 @@ export function routesFromOverpass(json: OverpassJson, opts: { minLengthM?: numb
       geometry: { type: "LineString", coordinates: line.map((c) => [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6]) },
       description: descParts.length ? descParts.join(" · ") : null,
       gaps,
+      source: "osm",
+      memberWayIds: members.map((m) => m.wayId),
     });
   }
   return out.sort((a, b) => b.distanceKm - a.distanceKm);

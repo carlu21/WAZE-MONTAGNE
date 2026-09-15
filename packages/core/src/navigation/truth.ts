@@ -25,22 +25,36 @@
 import { bearing, haversineM, offsetPoint } from "../geo";
 import type { LngLat } from "../geo";
 import type { LatLng } from "../types";
-import type { GpsQuality, PathSource, TrackPoint } from "./types";
+import type { GpsQuality, TrackPoint, TrailSource } from "./types";
 
 /* ------------------------------------------------------------------ */
 /* 1. Provenance : d'où vient la géométrie                             */
 /* ------------------------------------------------------------------ */
 
 /**
- * Sources relevées sur le terrain ou publiées par une autorité cartographique.
+ * Sources relevées sur le terrain ou publiées par une autorité cartographique :
+ * OpenStreetMap, l'IGN, une trace GPX, une collectivité (`official`), un
+ * professionnel de la montagne (`partner`).
+ *
  * `seed` et `local` en sont exclues : ce sont des données de démonstration ou
  * de travail, et présenter une démonstration comme un sentier réel est
  * exactement ce que ce module existe pour empêcher.
  */
-export const SURVEYED_SOURCES: readonly PathSource[] = ["osm", "ign", "gpx"];
+export const SURVEYED_SOURCES: readonly TrailSource[] = ["osm", "ign", "gpx", "official", "partner"];
 
-export function isSurveyed(source: PathSource | null | undefined): boolean {
+export function isSurveyed(source: TrailSource | null | undefined): boolean {
   return source !== null && source !== undefined && SURVEYED_SOURCES.includes(source);
+}
+
+/**
+ * Provenance retenue pour un tracé composé de plusieurs segments : la MOINS
+ * fiable de toutes. Un parcours n'est relevé que si chacun de ses maillons
+ * l'est — un seul tronçon de démonstration suffit à rendre l'ensemble faux.
+ * `null` quand la liste est vide : on ne sait pas, et on ne l'invente pas.
+ */
+export function weakestSource(sources: readonly TrailSource[]): TrailSource | null {
+  if (sources.length === 0) return null;
+  return sources.find((s) => !isSurveyed(s)) ?? sources[0];
 }
 
 /* ------------------------------------------------------------------ */
@@ -133,7 +147,7 @@ export type RouteRefusal =
 export interface RouteVerdictInput {
   coordinates: readonly LngLat[] | null | undefined;
   /** Provenance de la géométrie. `null` quand elle est inconnue — donc refusée. */
-  source: PathSource | null;
+  source: TrailSource | null;
   /** Longueur annoncée par la source (m), si connue. */
   declaredLengthM?: number | null;
   /** Nombre de segments de réseau chargés autour (0 = rien de connu). */
@@ -363,4 +377,61 @@ export function drawableTraceSegments(points: readonly TrackPoint[]): LngLat[][]
   return splitTrace(points)
     .segments.filter((s) => s.length >= 2)
     .map((s) => s.map((p) => [p.lng, p.lat] as LngLat));
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. Affichable, navigable — deux questions différentes                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Couverture minimale pour lancer un guidage. Pas 100 % : quelques membres
+ * manquants au bord d'une emprise d'import ne rendent pas un GR impraticable,
+ * et exiger la perfection reviendrait à ne jamais rien proposer. En dessous,
+ * le tracé reste VISIBLE — il est réel — mais « Démarrer » est refusé.
+ */
+export const NAVIGABLE_MIN_COVERAGE = 0.8;
+
+export interface TrailUsabilityInput {
+  coordinates: readonly LngLat[] | null | undefined;
+  source: TrailSource | null;
+  declaredLengthM?: number | null;
+  /**
+   * Part du parcours retrouvée dans le réseau (0..1), ou `null` quand la
+   * question ne se pose pas — une géométrie qui n'a pas été reconstruite depuis
+   * des segments n'a pas de couverture à afficher.
+   */
+  linkCoverage: number | null;
+  /** Segments associés. 0 = la géométrie vient de l'itinéraire lui-même. */
+  segmentCount: number;
+}
+
+export interface TrailUsability {
+  /** Le tracé peut être DESSINÉ : il décrit un chemin réel. */
+  drawable: boolean;
+  /** Un guidage peut être lancé dessus. */
+  navigable: boolean;
+  /** Dessinable, mais incomplètement rattaché au réseau : « Tracé partiellement vérifié ». */
+  partial: boolean;
+  refusal: RouteRefusal | null;
+  fidelity: GeometryFidelity;
+}
+
+/**
+ * DESSINABLE et NAVIGABLE ne sont pas la même chose.
+ *
+ * Un itinéraire dont la géométrie est relevée et détaillée mérite d'être vu :
+ * il existe. Mais s'il n'est rattaché qu'aux deux tiers au réseau, on ne peut
+ * pas promettre de guider dessus — le tiers manquant est précisément celui où
+ * l'application n'aurait rien à dire. On le montre, on le qualifie, et on
+ * n'ouvre pas « Démarrer ».
+ */
+export function trailUsability(input: TrailUsabilityInput): TrailUsability {
+  const verdict = routeVerdict({ coordinates: input.coordinates, source: input.source, declaredLengthM: input.declaredLengthM ?? null });
+  if (!verdict.drawable) {
+    return { drawable: false, navigable: false, partial: false, refusal: verdict.refusal, fidelity: verdict.fidelity };
+  }
+  const coverage = input.linkCoverage;
+  const measured = coverage !== null && Number.isFinite(coverage) && input.segmentCount > 0;
+  const partial = measured && coverage < NAVIGABLE_MIN_COVERAGE;
+  return { drawable: true, navigable: !partial, partial, refusal: null, fidelity: verdict.fidelity };
 }

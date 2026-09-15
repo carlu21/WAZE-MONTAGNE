@@ -34,6 +34,7 @@ import { db, type SavedTrack } from "@/lib/db";
 import { useUiStore } from "@/store/ui";
 import { deleteTrack, listTracks } from "./tracks";
 import { RoutePlanner } from "@/features/network/RoutePlanner";
+import { useNetworkStatus } from "@/features/network/NetworkHealth";
 import { useNavigationStore, type NavMode } from "./store";
 
 /** Libellés courts (quatre segments sur un écran de 390 px) ; les icônes servent de libellé accessible. */
@@ -124,8 +125,10 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
     },
     staleTime: 10 * 60_000,
   });
-  const stats = useQuery({ queryKey: qk.networkStats, queryFn: api.networkStats, enabled: online, staleTime: 30_000, refetchInterval: 60_000 });
-  const demoOnly = stats.data ? stats.data.trails.osm === 0 && stats.data.paths.osm === 0 : false;
+  // « Réseau réel disponible » est décidé par le serveur, à partir de la
+  // provenance enregistrée — plus par un test d'égalité à zéro côté client.
+  const { stats, realDataReady } = useNetworkStatus(online);
+  const demoOnly = stats !== null && !realDataReady;
 
   const list = useMemo(() => {
     const q = normalize(query.trim());

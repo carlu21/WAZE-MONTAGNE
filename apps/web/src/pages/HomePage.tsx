@@ -35,7 +35,7 @@ import {
   formatDistance,
   fr,
   interpolate,
-  routeVerdict,
+  trailUsability,
   type ActivityMode,
   type Basemap,
   type BBox,
@@ -61,6 +61,7 @@ import { useNearby } from "@/features/home/useNearby";
 import { fitZoomFor } from "@/features/home/format";
 import { useNavigationStore } from "@/features/navigation/store";
 import { planOnRealNetwork, refusalMessage } from "@/features/navigation/planner";
+import { NetworkBadge } from "@/features/network/NetworkHealth";
 
 /** Zoom du premier centrage sur la position : on voit le vallon, pas le pays. */
 export const HOME_ZOOM = 14;
@@ -222,15 +223,27 @@ export default function HomePage() {
   }, [geometry.data]);
 
   /**
-   * A-t-on le droit de DESSINER ce tracé et de le faire suivre ? Un tracé
-   * schématique (points de passage espacés de kilomètres) ou issu du jeu de
-   * démonstration est refusé : on ne trace pas une ligne droite à travers la
-   * montagne pour faire joli.
+   * A-t-on le droit de DESSINER ce tracé, et de lancer un guidage dessus ?
+   *
+   * Deux questions distinctes (`trailUsability`). Un tracé schématique ou issu
+   * du jeu de démonstration n'est pas dessiné du tout. Un vrai tracé
+   * incomplètement rattaché au réseau est dessiné, dit « partiellement
+   * vérifié », et « Démarrer » reste fermé.
+   *
+   * Le verdict est recalculé ICI sur la géométrie réellement reçue, même si
+   * l'API en a déjà rendu un : c'est la géométrie affichée qui doit être jugée,
+   * pas la fiche qui la décrit.
    */
-  const geometryVerdict = useMemo(() => {
+  const usability = useMemo(() => {
     const g = geometry.data;
     if (!g) return null;
-    return routeVerdict({ coordinates: g.coordinates, source: g.source, declaredLengthM: g.declaredLengthM });
+    return trailUsability({
+      coordinates: g.coordinates,
+      source: g.source,
+      declaredLengthM: g.declaredLengthM,
+      linkCoverage: g.linkCoverage,
+      segmentCount: g.segmentCount,
+    });
   }, [geometry.data]);
 
   /*
@@ -259,10 +272,16 @@ export default function HomePage() {
         toast.info("Tracé en cours de chargement…");
         return;
       }
-      // Le refus est une réponse : on ne démarre pas un guidage sur un tracé faux.
-      if (geometryVerdict && !geometryVerdict.drawable) {
-        const refusal = geometryVerdict.refusal ?? "no_geometry";
-        setNotice({ refusal, message: fr.navigation.unavailable.title, note: refusalMessage(refusal), direction: null });
+      // Le refus est une réponse : on ne démarre pas un guidage sur un tracé
+      // faux, ni sur un tracé dont une part n'est rattachée à aucun chemin connu.
+      if (usability && !usability.navigable) {
+        const refusal = usability.refusal ?? "schematic_geometry";
+        setNotice({
+          refusal,
+          message: fr.navigation.unavailable.title,
+          note: usability.partial ? fr.navigation.unavailable.partial : refusalMessage(refusal),
+          direction: null,
+        });
         return;
       }
       const route = buildRoute({
@@ -275,7 +294,7 @@ export default function HomePage() {
       useNavigationStore.getState().start({ mode: "route", route, originalRoute: null, simulate: false });
       navigate("/navigate");
     },
-    [geometry.data, geometryVerdict, navigate],
+    [geometry.data, usability, navigate],
   );
 
   /**
@@ -360,7 +379,7 @@ export default function HomePage() {
           trails={trails}
           selectedId={selectedId}
           selectedGeometry={geometry.data?.coordinates ?? null}
-          geometryDrawable={geometryVerdict?.drawable ?? false}
+          geometryDrawable={usability?.drawable ?? false}
           nearbyPaths={showPaths ? (nearbyPaths.data?.paths ?? null) : null}
           direction={direction}
           heading={heading}
@@ -380,6 +399,8 @@ export default function HomePage() {
         >
           <Layers />
         </IconButton>
+        {/* Sur quoi travaille-t-on ? Développement uniquement. */}
+        <NetworkBadge />
         {layersOpen && (
           <div className="ml-glass rounded-2xl p-1 shadow-md">
             <Segmented
@@ -444,7 +465,9 @@ export default function HomePage() {
         onGuideToStart={(t) => void guideToStart(t)}
         planning={planning}
         notice={notice}
-        traceNotice={geometryVerdict && !geometryVerdict.drawable ? refusalMessage(geometryVerdict.refusal ?? "no_geometry") : null}
+        traceNotice={usability && !usability.drawable ? refusalMessage(usability.refusal ?? "no_geometry") : null}
+        partialNotice={usability?.partial ? fr.navigation.unavailable.partial : null}
+        canStart={usability?.navigable ?? false}
         pathsShown={showPaths}
         onShowNearbyPaths={() => setShowPaths((v) => !v)}
       />

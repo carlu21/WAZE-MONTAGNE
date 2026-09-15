@@ -286,15 +286,30 @@ describe("Randonnées autour de vous", () => {
 });
 
 describe("Tracé complet d'un itinéraire", () => {
-  it("sert la géométrie, et dit ne pas connaître les altitudes", async () => {
+  it("reconstruit le tracé depuis les segments du réseau, pas depuis le schéma stocké", async () => {
     const res = await call<TrailGeometryResponse>(app, "GET", "/trails/t_restonica_melo/geometry");
     expect(res.status).toBe(200);
     expect(res.body.id).toBe("t_restonica_melo");
     expect(res.body.name).toContain("Restonica");
-    expect(res.body.coordinates).toHaveLength(7);
+
+    /*
+     * `trails.geometry` ne compte que 7 sommets — des points de passage. La
+     * réponse en compte bien davantage : elle vient des SEGMENTS du réseau
+     * navigable, qui est la donnée sur laquelle le guidage travaillera.
+     */
+    expect(res.body.geometryFrom).toBe("segments");
+    expect(res.body.segmentCount).toBeGreaterThan(0);
+    expect(res.body.coordinates.length).toBeGreaterThan(7);
+
     // Le premier sommet est le départ servi par la liste : le tracé affiché à
     // la sélection part bien du point annoncé.
     expect(res.body.coordinates[0]).toEqual([GROTELLE.lng, GROTELLE.lat]);
+
+    // Provenance : de la démonstration, et l'API le dit franchement — c'est ce
+    // qui permettra à l'interface de refuser de la présenter comme un sentier.
+    expect(res.body.trailSource).toBe("seed");
+    expect(res.body.source).toBe("seed");
+
     // Aucune altimétrie dans le jeu de démonstration : `null`, et non un
     // tableau de zéros qui aplatirait la vallée de la Restonica.
     expect(res.body.elevations).toBeNull();

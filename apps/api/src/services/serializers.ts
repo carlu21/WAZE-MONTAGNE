@@ -188,6 +188,9 @@ export function toArea(row: AreaRow): Area {
 
 export function toTrail(row: TrailRow): Trail {
   return {
+    // La provenance voyage avec l'itinéraire : c'est elle, et non le préfixe de
+    // l'identifiant, qui autorise plus loin à dessiner le tracé.
+    source: row.source ?? null,
     id: row.id,
     name: row.name,
     type: row.type,

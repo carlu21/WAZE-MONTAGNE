@@ -118,6 +118,12 @@ function trail(over: Partial<NearbyTrail> & { id: string }): NearbyTrail {
     lengthM: 5000,
     durationMs: 2 * 3_600_000,
     durationObserved: false,
+    // Par défaut : une vraie randonnée OSM navigable. Les tests qui veulent une
+    // donnée de démonstration le disent explicitement.
+    source: "osm",
+    drawable: true,
+    navigable: true,
+    partial: false,
     elevationGainM: 400,
     elevationLossM: null,
     trailhead: { point: GROTELLE, distanceM: 1000, end: "start" },
@@ -719,5 +725,25 @@ describe("approche et longueur de bout en bout", () => {
     expect(describeApproach(card.approachM)).toContain("de vous");
     expect(describeLength(card.lengthM)).toContain("Randonnée");
     expect(describeApproach(card.approachM)).not.toBe(describeLength(card.lengthM));
+  });
+});
+
+describe("priorité aux données réelles (section 29)", () => {
+  it("place une vraie randonnée devant une démonstration, même plus proche", () => {
+    const demo = trail({ id: "demo", approachM: 100, source: "seed", drawable: false, navigable: false });
+    const real = trail({ id: "reel", approachM: 9000, source: "osm" });
+    expect(rankNearby([demo, real], "closest").map((t) => t.id)).toEqual(["reel", "demo"]);
+  });
+
+  it("place une randonnée navigable devant une seulement affichable", () => {
+    const partiel = trail({ id: "partiel", approachM: 100, navigable: false, partial: true });
+    const complet = trail({ id: "complet", approachM: 4000 });
+    expect(rankNearby([partiel, complet], "closest").map((t) => t.id)).toEqual(["complet", "partiel"]);
+  });
+
+  it("conserve le critère demandé entre données de même qualité", () => {
+    const proche = trail({ id: "proche", approachM: 300 });
+    const loin = trail({ id: "loin", approachM: 8000 });
+    expect(rankNearby([loin, proche], "closest").map((t) => t.id)).toEqual(["proche", "loin"]);
   });
 });

@@ -53,6 +53,10 @@ export interface TrailPreviewSheetProps {
   notice?: TrailPreviewNotice | null;
   /** Le tracé de la randonnée elle-même n'est pas exploitable : on ne le dessine pas. */
   traceNotice?: string | null;
+  /** Le tracé est réel mais incomplètement rattaché : on le montre avec sa réserve. */
+  partialNotice?: string | null;
+  /** Le guidage peut-il être lancé ? Faux → « Démarrer » reste fermé. */
+  canStart?: boolean;
   pathsShown?: boolean;
   onShowNearbyPaths?: () => void;
 }
@@ -73,9 +77,9 @@ export const PREVIEW_PEEK_ROUTE_NOTICE = 170;
  */
 export const PREVIEW_PEEK_MAX = 552;
 
-export function previewPeekHeight(traceNotice: string | null, notice: TrailPreviewNotice | null): number {
-  const wanted = PREVIEW_PEEK_BASE + (traceNotice ? PREVIEW_PEEK_TRACE_NOTICE : 0) + (notice ? PREVIEW_PEEK_ROUTE_NOTICE : 0);
-  return Math.min(wanted, PREVIEW_PEEK_MAX);
+export function previewPeekHeight(traceNotice: string | null, notice: TrailPreviewNotice | null, partialNotice: string | null = null): number {
+  const explanations = (traceNotice || partialNotice ? PREVIEW_PEEK_TRACE_NOTICE : 0) + (notice ? PREVIEW_PEEK_ROUTE_NOTICE : 0);
+  return Math.min(PREVIEW_PEEK_BASE + explanations, PREVIEW_PEEK_MAX);
 }
 
 export function TrailPreviewSheet({
@@ -86,6 +90,8 @@ export function TrailPreviewSheet({
   planning = false,
   notice = null,
   traceNotice = null,
+  partialNotice = null,
+  canStart = true,
   pathsShown = false,
   onShowNearbyPaths,
 }: TrailPreviewSheetProps) {
@@ -102,7 +108,7 @@ export function TrailPreviewSheet({
       // Le palier d'aperçu montre l'essentiel ET l'action principale en entier :
       // une randonnée qu'il faut faire glisser pour savoir comment la lancer
       // n'est pas « immédiatement compréhensible ».
-      snapPoints={{ peek: previewPeekHeight(traceNotice, notice), half: 0.62, full: 0.92 }}
+      snapPoints={{ peek: previewPeekHeight(traceNotice, notice, partialNotice), half: 0.62, full: 0.92 }}
       backdrop="none"
       title={trail.name}
       aria-label={`Randonnée ${trail.name}`}
@@ -127,6 +133,21 @@ export function TrailPreviewSheet({
               {fr.navigation.unavailable.soon}
             </p>
             <p className="mt-1 text-[13px] leading-snug text-muted">{traceNotice}</p>
+          </div>
+        )}
+
+        {/*
+          Tracé réel, mais partiellement rattaché au réseau. On le montre — il
+          existe — et on dit exactement ce qui manque plutôt que de laisser
+          croire à un parcours vérifié de bout en bout.
+        */}
+        {partialNotice && !traceNotice && (
+          <div className="rounded-xl border border-line bg-surface-2 px-3 py-2" data-testid="trail-partial-notice">
+            <p className="flex items-start gap-2 text-[14px] font-semibold text-fg">
+              <Route className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              {fr.navigation.unavailable.partialShort}
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-muted">{partialNotice}</p>
           </div>
         )}
 
@@ -171,7 +192,7 @@ export function TrailPreviewSheet({
 
         <div className="space-y-2">
           {here ? (
-            <Button size="lg" fullWidth leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice)} data-testid="trail-start">
+            <Button size="lg" fullWidth leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice) || !canStart} data-testid="trail-start">
               Démarrer la randonnée
             </Button>
           ) : (
@@ -181,7 +202,7 @@ export function TrailPreviewSheet({
           )}
           <div className="grid grid-cols-2 gap-2">
             {!here && (
-              <Button size="md" variant="secondary" leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice)}>
+              <Button size="md" variant="secondary" leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice) || !canStart}>
                 Démarrer quand même
               </Button>
             )}

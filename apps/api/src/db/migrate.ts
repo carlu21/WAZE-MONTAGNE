@@ -688,7 +688,96 @@ const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS paths_source_idx ON paths(source_id)`,
     ],
   },
+
+  {
+    version: 6,
+    name: "réseau réel : provenance des itinéraires, way ids des segments, liaison randonnée ↔ segments",
+    statements: [
+      /*
+       * Identifiant de l'objet SOURCE d'un segment — `way/891234` pour
+       * OpenStreetMap. Un way découpé à ses intersections produit plusieurs
+       * segments (`osm_891234_0`, `_1`, `_2`) qui partagent tous cette valeur.
+       * C'est elle qui relie une relation OSM au réseau ; analyser le préfixe
+       * des identifiants marchait, mais se cassait au premier changement de
+       * convention de nommage.
+       */
+      `ALTER TABLE paths ADD COLUMN source_feature_id TEXT`,
+      `CREATE INDEX IF NOT EXISTS paths_source_feature_idx ON paths(source_feature_id)`,
+
+      /*
+       * Qualité de la liaison d'un itinéraire, mesurée à l'import et conservée :
+       *  - member_way_count   : membres attendus dans la relation OSM
+       *  - resolved_way_count : membres effectivement retrouvés dans `paths`
+       *  - link_coverage      : le rapport des deux (0..1)
+       *  - geometry_confidence: pénalisée par les tronçons non raccordés (gaps)
+       * Sans ces colonnes, « 120 membres sur 127 » et « 127 sur 127 » seraient
+       * indiscernables — et le second seul est navigable sans réserve.
+       */
+      `ALTER TABLE trails ADD COLUMN member_way_count INTEGER`,
+      `ALTER TABLE trails ADD COLUMN resolved_way_count INTEGER`,
+      `ALTER TABLE trails ADD COLUMN link_coverage REAL`,
+      `ALTER TABLE trails ADD COLUMN geometry_confidence REAL`,
+      `ALTER TABLE trails ADD COLUMN gap_count INTEGER`,
+
+      /*
+       * LA relation qui manquait : un itinéraire est composé de segments, et un
+       * même segment appartient à plusieurs itinéraires. Le GR20, une boucle
+       * locale, un itinéraire équestre et un parcours VTT peuvent emprunter le
+       * même sentier — `paths.trail_id` ne pouvait en retenir qu'un, et écrasait
+       * les autres en silence.
+       *
+       * `sequence` porte l'ordre de parcours, `direction` le sens dans lequel le
+       * segment est emprunté (un même tronçon se parcourt à l'endroit dans un
+       * sens de GR et à l'envers dans l'autre).
+       */
+      `CREATE TABLE IF NOT EXISTS trail_segments (
+        id TEXT PRIMARY KEY,
+        trail_id TEXT NOT NULL,
+        segment_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'forward',
+        role TEXT NOT NULL DEFAULT 'main',
+        source TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS trail_segments_unique_idx ON trail_segments(trail_id, segment_id, sequence)`,
+      `CREATE INDEX IF NOT EXISTS trail_segments_trail_idx ON trail_segments(trail_id, sequence)`,
+      `CREATE INDEX IF NOT EXISTS trail_segments_segment_idx ON trail_segments(segment_id)`,
+
+      /*
+       * Provenance des itinéraires déjà en base. Les lignes antérieures n'ont
+       * jamais reçu de `source` : celles dont l'identifiant vient d'un import
+       * OSM sont marquées ici UNE FOIS, à titre de rattrapage. Le pipeline,
+       * lui, écrit désormais la provenance explicitement — cette déduction ne
+       * sert qu'à ne pas perdre les données existantes.
+       */
+      `UPDATE trails SET source = 'osm' WHERE source IS NULL AND id LIKE 'osm_rel_%'`,
+      `UPDATE trails SET source = 'seed' WHERE source IS NULL`,
+
+      /* Les segments de démonstration déjà rattachés gardent leur lien, repris
+         dans la nouvelle table pour que rien ne disparaisse à la migration. */
+      `INSERT OR IGNORE INTO trail_segments (id, trail_id, segment_id, sequence, direction, role, source, created_at)
+        SELECT 'mig6_' || p.id, p.trail_id, p.id, 0, 'forward', 'main', 'seed', datetime('now')
+        FROM paths p WHERE p.trail_id IS NOT NULL`,
+    ],
+  },
 ];
+
+/**
+ * Exécute une instruction en tolérant la seule erreur qui doit l'être : une
+ * colonne déjà présente. SQLite ne connaît pas `ADD COLUMN IF NOT EXISTS`, et
+ * une base à moitié migrée — cela arrive, en développement — obligerait sinon à
+ * tout supprimer pour repartir. Toute autre erreur reste fatale.
+ */
+function execTolerant(sqlite: Database.Database, statement: string): void {
+  try {
+    sqlite.exec(statement);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/duplicate column name/i.test(message)) return;
+    throw err;
+  }
+}
 
 /** Applique toutes les migrations manquantes. Sans effet si la base est à jour. */
 export function runMigrations(sqlite: Database.Database): { applied: number[] } {
@@ -704,7 +793,7 @@ export function runMigrations(sqlite: Database.Database): { applied: number[] } 
   for (const m of MIGRATIONS) {
     if (done.has(m.version)) continue;
     const tx = sqlite.transaction(() => {
-      for (const statement of m.statements) sqlite.exec(statement);
+      for (const statement of m.statements) execTolerant(sqlite, statement);
       insert.run(m.version, new Date().toISOString());
     });
     tx();

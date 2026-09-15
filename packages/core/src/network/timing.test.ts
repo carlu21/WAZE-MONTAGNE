@@ -195,6 +195,7 @@ describe("segmentProfile", () => {
       elevations: null,
       lengthM: 0,
       source: "local",
+      sourceFeatureId: null,
     };
     const profileVide = segmentProfile(vide);
     expect(profileVide.distanceM).toBe(0);

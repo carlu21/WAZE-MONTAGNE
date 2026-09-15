@@ -16,7 +16,9 @@
     "geo:import": "tsx src/db/import-geonames.ts",
     "geo:import-osm": "tsx src/db/import-osm.ts",
     "db:seed-activities": "tsx src/db/seed-activities-cli.ts",
-    "db:seed-sources": "tsx src/db/seed-sources-cli.ts"
+    "db:seed-sources": "tsx src/db/seed-sources-cli.ts",
+    "network:doctor": "tsx src/db/network-doctor.ts",
+    "geo:relink": "tsx src/db/import-osm.ts --relink-only"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",

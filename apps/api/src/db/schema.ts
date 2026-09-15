@@ -22,6 +22,7 @@ import type {
   ContributionStatus,
   PathKind,
   PathSource,
+  TrailSource,
   TraversalDirection,
   GeometryLayer,
   GpxQualityLevel,
@@ -256,9 +257,20 @@ export const trails = sqliteTable(
     description: text("description"),
     createdAt: text("created_at").notNull(),
     /** Provenance (osm, ign, seed, partner…) et état, migration 4. */
-    source: text("source"),
+    source: text("source").$type<TrailSource>(),
     status: text("status").$type<"open" | "closed" | null>(),
     confidenceScore: real("confidence_score"),
+    // --- Qualité de la liaison au réseau (migration 6) ---
+    /** Membres attendus dans la relation source. */
+    memberWayCount: integer("member_way_count"),
+    /** Membres effectivement retrouvés dans `paths`. */
+    resolvedWayCount: integer("resolved_way_count"),
+    /** `resolvedWayCount / memberWayCount` (0..1). */
+    linkCoverage: real("link_coverage"),
+    /** Confiance dans la géométrie assemblée (0..1), pénalisée par les ruptures. */
+    geometryConfidence: real("geometry_confidence"),
+    /** Tronçons non raccordés lors de l'assemblage de la relation. */
+    gapCount: integer("gap_count"),
   },
   (t) => [index("trails_bbox_idx").on(t.minLat, t.minLng)],
 );
@@ -286,6 +298,8 @@ export const paths = sqliteTable(
     elevations: text("elevations", { mode: "json" }).$type<number[] | null>(),
     lengthM: integer("length_m").notNull(),
     source: text("source").$type<PathSource>().notNull(),
+    /** Objet source dont ce segment est issu (`way/891234`), migration 6. */
+    sourceFeatureId: text("source_feature_id"),
     minLat: real("min_lat").notNull(),
     minLng: real("min_lng").notNull(),
     maxLat: real("max_lat").notNull(),
@@ -328,6 +342,42 @@ export const paths = sqliteTable(
     index("paths_source_idx").on(t.source),
     index("paths_trail_idx").on(t.trailId),
     index("paths_nodes_idx").on(t.startNode, t.endNode),
+    index("paths_source_feature_idx").on(t.sourceFeatureId),
+  ],
+);
+
+/**
+ * CE QUE CETTE RANDONNÉE EMPRUNTE (migration 6).
+ *
+ * Un itinéraire est composé de segments, et un même segment appartient à
+ * plusieurs itinéraires : le GR20, une boucle locale, un parcours équestre et
+ * un tracé VTT peuvent emprunter le même sentier. `paths.trail_id` ne pouvait
+ * en retenir qu'un seul et écrasait les autres sans rien dire ; il reste
+ * uniquement pour les données de démonstration antérieures.
+ *
+ * `sequence` reconstruit l'ordre de parcours, `direction` le sens dans lequel
+ * le tronçon est emprunté — le même sentier se parcourt à l'endroit dans un
+ * sens de GR et à l'envers dans l'autre.
+ */
+export const trailSegments = sqliteTable(
+  "trail_segments",
+  {
+    id: text("id").primaryKey(),
+    trailId: text("trail_id").notNull(),
+    segmentId: text("segment_id").notNull(),
+    /** Rang dans le parcours, à partir de 0. */
+    sequence: integer("sequence").notNull(),
+    direction: text("direction").$type<"forward" | "backward">().notNull().default("forward"),
+    /** `main` aujourd'hui ; `alternative`, `approach`… quand les variantes viendront. */
+    role: text("role").notNull().default("main"),
+    /** D'où vient l'ASSOCIATION (pas le segment) : import OSM, GPX, saisie manuelle. */
+    source: text("source").$type<TrailSource>().notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("trail_segments_unique_idx").on(t.trailId, t.segmentId, t.sequence),
+    index("trail_segments_trail_idx").on(t.trailId, t.sequence),
+    index("trail_segments_segment_idx").on(t.segmentId),
   ],
 );
 
@@ -939,6 +989,7 @@ export type PhotoRow = typeof photos.$inferSelect;
 export type OfficialAlertRow = typeof officialAlerts.$inferSelect;
 export type TrailRow = typeof trails.$inferSelect;
 export type PathRow = typeof paths.$inferSelect;
+export type TrailSegmentRow = typeof trailSegments.$inferSelect;
 export type ActivityRow = typeof activities.$inferSelect;
 export type ActivityPointRow = typeof activityPoints.$inferSelect;
 export type MatchedPointRow = typeof activityMatchedPoints.$inferSelect;

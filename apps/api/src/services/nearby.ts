@@ -49,8 +49,11 @@ import {
   distanceToPolylineM,
   estimateTime,
   frequentationLevel,
+  haversineM,
   isPublishable,
   isSurveyed,
+  trailUsability,
+  weakestSource,
   nearbyNote,
   nearestTrailhead,
   rankNearby,
@@ -68,17 +71,18 @@ import {
   type NearbyResult,
   type NearbySort,
   type NearbyTrail,
-  type PathSource,
   type ReportHintInput,
   type SegmentProfile,
   type SegmentStatistics,
   type TrailGeometryResponse,
   type TrailShape,
   type Trailhead,
+  type TrailSource,
 } from "@mountain-live/core";
 import { db } from "../db/client";
 import { paths, segmentStatistics, trails, type PathRow, type TrailRow } from "../db/schema";
 import { rowToStatistics } from "./network-stats";
+import { geometryFromSegments, trailSegmentRows } from "./trail-segments";
 import { toPathSegment } from "./paths";
 import { listVisibleReports } from "./reports";
 
@@ -597,9 +601,27 @@ export function nearbyTrails(input: NearbyInput, now = Date.now()): NearbyResult
     });
     const network = summarizeNetwork(attached, statsBySegment, now);
 
+    /*
+     * AFFICHABLE / NAVIGABLE — décidé ici, une fois, à partir de la provenance
+     * enregistrée et de la couverture mesurée à l'import. L'interface n'a plus
+     * à en juger : elle lit un booléen, et le bouton « Démarrer » ne dépend
+     * jamais d'une inspection de la géométrie côté navigateur.
+     */
+    const usability = trailUsability({
+      coordinates: candidate.line,
+      source: (row.source ?? null) as TrailSource | null,
+      declaredLengthM: Number.isFinite(row.distanceKm) && row.distanceKm > 0 ? Math.round(row.distanceKm * 1000) : null,
+      linkCoverage: row.linkCoverage ?? null,
+      segmentCount: row.resolvedWayCount ?? 0,
+    });
+
     return {
       id: row.id,
       name: row.name,
+      source: (row.source ?? null) as TrailSource | null,
+      drawable: usability.drawable,
+      navigable: usability.navigable,
+      partial: usability.partial,
       activity: trailActivity(row),
       difficulty: row.difficulty,
       shape,
@@ -710,18 +732,59 @@ function trailElevations(line: readonly LngLat[], segments: readonly PathRow[]):
 export function trailGeometry(id: string): TrailGeometryResponse | null {
   const row = db.select().from(trails).where(eq(trails.id, id)).get();
   if (row === undefined) return null;
-  const line = trailLine(row);
-  const attached = db.select().from(paths).where(eq(paths.trailId, row.id)).all();
+
   /*
-   * Provenance du tracé : celle des segments qui le composent quand ils sont
-   * unanimes, sinon celle de la moins fiable d'entre elles. Elle est envoyée
-   * telle quelle — c'est le client qui décide, à partir d'elle, s'il a le droit
-   * de dessiner l'itinéraire (`routeVerdict`). Ne jamais « promouvoir » une
-   * géométrie de démonstration en géométrie relevée pour faire joli.
+   * PRIORITÉ AUX SEGMENTS RÉELS.
+   *
+   * `trails.geometry` est le tracé assemblé par la source — parfait pour un
+   * affichage, mais ce n'est pas notre réseau navigable. Dès que l'itinéraire
+   * est associé à des segments, on reconstruit sa géométrie à partir d'eux :
+   * elle suit alors par construction des chemins qui existent, et le moteur de
+   * navigation travaille sur la même donnée que le routage.
+   *
+   * Les ruptures ne sont jamais comblées : `geometryFromSegments` rend des
+   * morceaux séparés, et on ne retient que le plus long plutôt que de les
+   * relier par un trait droit.
    */
-  const sources = new Set(attached.map((p) => p.source as PathSource));
-  const source: PathSource | null =
-    sources.size === 0 ? null : [...sources].find((s) => !isSurveyed(s)) ?? [...sources][0];
+  const linked = trailSegmentRows(row.id);
+  const parts = linked.length > 0 ? geometryFromSegments(linked) : [];
+  const fromSegments = parts.length > 0 ? parts.reduce((a, b) => (lineLengthM(b) > lineLengthM(a) ? b : a)) : [];
+  const useSegments = fromSegments.length >= 2;
+
+  const line = useSegments ? fromSegments : trailLine(row);
+
+  /*
+   * PROVENANCE (section 13).
+   *
+   * Géométrie reconstruite → celle de ses segments, la moins fiable faisant
+   * foi. Géométrie stockée → celle de l'itinéraire lui-même. Dans les deux cas
+   * elle est LUE, jamais déduite d'un préfixe d'identifiant, et jamais rendue
+   * `null` quand on dispose réellement d'une provenance.
+   */
+  const trailSource = (row.source ?? null) as TrailSource | null;
+  const segmentSources = linked.map(({ path }) => path.source as TrailSource);
+  const source = useSegments ? (weakestSource(segmentSources) ?? trailSource) : trailSource;
+
+  const attached = linked.map(({ path }) => path);
   const declaredLengthM = Number.isFinite(row.distanceKm) && row.distanceKm > 0 ? Math.round(row.distanceKm * 1000) : null;
-  return { id: row.id, name: row.name, coordinates: line, elevations: trailElevations(line, attached), source, declaredLengthM };
+  return {
+    id: row.id,
+    name: row.name,
+    coordinates: line,
+    elevations: trailElevations(line, attached.length > 0 ? attached : db.select().from(paths).where(eq(paths.trailId, row.id)).all()),
+    source,
+    trailSource,
+    geometryFrom: useSegments ? "segments" : "trail",
+    segmentCount: linked.length,
+    linkCoverage: row.linkCoverage ?? null,
+    geometryConfidence: row.geometryConfidence ?? null,
+    declaredLengthM,
+  };
+}
+
+/** Longueur d'une polyligne (m). */
+function lineLengthM(line: readonly LngLat[]): number {
+  let total = 0;
+  for (let i = 1; i < line.length; i++) total += haversineM({ lng: line[i - 1][0], lat: line[i - 1][1] }, { lng: line[i][0], lat: line[i][1] });
+  return total;
 }

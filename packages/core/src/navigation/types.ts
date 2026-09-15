@@ -31,6 +31,15 @@ export type PathKind =
 
 export type PathSource = "osm" | "ign" | "seed" | "gpx" | "local";
 
+/**
+ * Provenance d'un ITINÉRAIRE. Les mêmes valeurs que pour un segment, plus deux
+ * qui n'ont de sens qu'à l'échelle d'un parcours : `official` (une commune, un
+ * parc, un office de tourisme) et `partner` (un guide, un berger, un
+ * accompagnateur). Un seul type pour les deux échelles serait plus simple mais
+ * mentirait : personne ne « publie officiellement » un tronçon de 40 mètres.
+ */
+export type TrailSource = PathSource | "official" | "partner";
+
 /** Segment du réseau de chemins : une arête du graphe, nœuds aux extrémités. */
 export interface PathSegment {
   id: string;
@@ -56,6 +65,14 @@ export interface PathSegment {
   elevations: number[] | null;
   lengthM: number;
   source: PathSource;
+  /**
+   * Identifiant de l'objet SOURCE dont ce segment est issu, par exemple
+   * `way/891234` pour OpenStreetMap. Un way découpé à ses intersections donne
+   * plusieurs segments (`osm_891234_0`, `_1`, `_2`) qui partagent tous ce même
+   * identifiant : c'est lui qui permet de relier une relation OSM au réseau,
+   * sans analyser les chaînes de caractères des identifiants de segments.
+   */
+  sourceFeatureId: string | null;
 }
 
 /** Relevé de position (GPS/GNSS ou source externe). */

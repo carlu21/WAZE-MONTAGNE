@@ -3,7 +3,7 @@
  * lot, et découpage des lignes aux nœuds partagés pour que chaque intersection
  * soit une extrémité de segment (hypothèse du graphe côté client).
  */
-import { and, gte, lte, sql } from "drizzle-orm";
+import { and, gte, inArray, lte, sql } from "drizzle-orm";
 import { makeSegment, nodeKey, type BBox, type LngLat, type PathSegment } from "@mountain-live/core";
 import { db } from "../db/client";
 import { paths, type PathRow } from "../db/schema";
@@ -26,6 +26,7 @@ export function toPathSegment(row: PathRow): PathSegment {
     elevations: row.elevations ?? null,
     lengthM: row.lengthM,
     source: row.source,
+    sourceFeatureId: row.sourceFeatureId ?? null,
   };
 }
 
@@ -85,12 +86,13 @@ export function upsertPaths(segments: readonly PathSegment[]): number {
             elevations: s.elevations,
             lengthM: s.lengthM,
             source: s.source,
+            sourceFeatureId: s.sourceFeatureId,
             ...e,
             updatedAt: now,
           })
           .onConflictDoUpdate({
             target: paths.id,
-            set: { name: s.name, kind: s.kind, surface: s.surface, sacScale: s.sacScale, widthM: s.widthM, foot: s.foot, bicycle: s.bicycle, horse: s.horse, ford: s.ford, status: s.status, coordinates: s.coordinates.map((c) => [c[0], c[1]] as [number, number]), elevations: s.elevations, lengthM: s.lengthM, source: s.source, ...e, updatedAt: now },
+            set: { name: s.name, kind: s.kind, surface: s.surface, sacScale: s.sacScale, widthM: s.widthM, foot: s.foot, bicycle: s.bicycle, horse: s.horse, ford: s.ford, status: s.status, coordinates: s.coordinates.map((c) => [c[0], c[1]] as [number, number]), elevations: s.elevations, lengthM: s.lengthM, source: s.source, sourceFeatureId: s.sourceFeatureId, ...e, updatedAt: now },
           })
           .run();
       }
@@ -109,6 +111,38 @@ export interface RawWay {
   id: string;
   coordinates: LngLat[];
   meta: Partial<Omit<PathSegment, "id" | "coordinates" | "lengthM">>;
+}
+
+/**
+ * UN OBJET SOURCE → TOUS LES SEGMENTS QUI EN SONT ISSUS.
+ *
+ * Un way OpenStreetMap découpé à ses intersections donne plusieurs segments.
+ * Cette fonction est le SEUL endroit qui sait faire la correspondance : elle
+ * interroge `source_feature_id`, et ne devine rien à partir des identifiants.
+ * Tout le reste du code passe par elle.
+ */
+export function segmentRowsByFeatureIds(featureIds: readonly string[]): Map<string, PathRow[]> {
+  const out = new Map<string, PathRow[]>();
+  const unique = [...new Set(featureIds)].filter((id) => id.length > 0);
+  if (unique.length === 0) return out;
+  // SQLite plafonne le nombre de paramètres d'une requête : on interroge par lots.
+  for (let i = 0; i < unique.length; i += 400) {
+    const batch = unique.slice(i, i + 400);
+    const rows = db.select().from(paths).where(inArray(paths.sourceFeatureId, batch)).all();
+    for (const row of rows) {
+      const key = row.sourceFeatureId;
+      if (key === null) continue;
+      const list = out.get(key);
+      if (list) list.push(row);
+      else out.set(key, [row]);
+    }
+  }
+  return out;
+}
+
+/** Identifiant d'objet source OpenStreetMap, dans la forme retenue partout : `way/891234`. */
+export function osmFeatureId(wayId: number | string): string {
+  return `way/${String(wayId).replace(/^way\//, "")}`;
 }
 
 /**
@@ -145,6 +179,8 @@ export function splitAtSharedNodes(ways: readonly RawWay[]): PathSegment[] {
     parts.forEach((coords, idx) => {
       if (coords.length < 2) return;
       const id = parts.length === 1 ? w.id : `${w.id}_${idx}`;
+      // Tous les morceaux d'un way gardent l'identifiant de CE way : c'est ce
+      // qui permettra de retrouver l'ensemble, découpage compris.
       out.push(makeSegment(id, coords, w.meta));
     });
   }

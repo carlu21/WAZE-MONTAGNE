@@ -2,6 +2,8 @@ import { pathToFileURL } from "node:url";
 import { eq, sql } from "drizzle-orm";
 import {
   SUBTYPE_BY_ID,
+  cumulativeDistances,
+  projectOnPolyline,
   type AreaType,
   type BadgeId,
   type ConfirmationKind,
@@ -33,6 +35,7 @@ import {
   reportConfirmations,
   reports,
   trails,
+  trailSegments,
   userPreferences,
   userReputationEvents,
   users,
@@ -552,7 +555,7 @@ function wipe(): void {
 }
 
 /** Lieux, sentiers et points d'eau (données de référence, sans compte). */
-export function seedReference(): { areas: number; trails: number; waterPoints: number; paths: number } {
+export function seedReference(): { areas: number; trails: number; waterPoints: number; paths: number; links: number } {
   const now = iso(NOW);
   for (const a of AREAS) {
     const bbox = a.halfKm
@@ -579,6 +582,9 @@ export function seedReference(): { areas: number; trails: number; waterPoints: n
         maxLat: bbox.north,
         maxLng: bbox.east,
         description: t.description,
+        // Provenance écrite EXPLICITEMENT : ces sentiers sont de la
+        // démonstration, et l'application doit pouvoir le dire sans l'inférer.
+        source: "seed",
         createdAt: now,
       })
       .run();
@@ -601,8 +607,8 @@ export function seedReference(): { areas: number; trails: number; waterPoints: n
   }
   // Réseau de chemins de démonstration (les segments OSM importés, s'il y en a, sont conservés).
   const network = upsertPaths(buildDemoNetwork(TRAILS));
-  linkPathsToTrails();
-  return { areas: AREAS.length, trails: TRAILS.length, waterPoints: WATER.length, paths: network };
+  const links = linkPathsToTrails();
+  return { areas: AREAS.length, trails: TRAILS.length, waterPoints: WATER.length, paths: network, links: links.links };
 }
 
 /**
@@ -614,17 +620,59 @@ export function seedReference(): { areas: number; trails: number; waterPoints: n
  * rattachement est donc déductible de leur identifiant — un import réel, lui,
  * devra le porter explicitement.
  */
-function linkPathsToTrails(): number {
-  let linked = 0;
+/**
+ * Relie les sentiers de démonstration à leurs segments.
+ *
+ * DEUX écritures, et c'est voulu : `paths.trail_id` pour les lectures
+ * historiques qui s'en servent encore, et surtout `trail_segments`, qui est
+ * désormais l'architecture. La démonstration exerce ainsi la même chaîne que
+ * les données réelles — sans quoi le chemin critique ne serait jamais testé
+ * tant qu'un import OSM n'a pas eu lieu.
+ */
+function linkPathsToTrails(): { paths: number; links: number } {
+  let updated = 0;
+  let links = 0;
+  const now = new Date().toISOString();
   for (const trail of TRAILS) {
     const prefix = `d_${trail.id}`;
-    linked += db
-      .update(paths)
-      .set({ trailId: trail.id })
-      .where(sql`${paths.id} = ${prefix} OR ${paths.id} LIKE ${`${prefix}\_%`} ESCAPE '\\'`)
-      .run().changes;
+    const match = sql`${paths.id} = ${prefix} OR ${paths.id} LIKE ${`${prefix}\_%`} ESCAPE '\\'`;
+    updated += db.update(paths).set({ trailId: trail.id }).where(match).run().changes;
+
+    const rows = db.select().from(paths).where(match).all();
+    const geometry = trail.coords.map((c) => [c[0], c[1]] as [number, number]);
+    const ordered = orderSegmentsAlong(rows, geometry);
+    for (const [sequence, row] of ordered.entries()) {
+      db.insert(trailSegments)
+        .values({
+          id: `${trail.id}::${row.id}::${sequence}`,
+          trailId: trail.id,
+          segmentId: row.id,
+          sequence,
+          direction: "forward",
+          role: "main",
+          source: "seed",
+          createdAt: now,
+        })
+        .onConflictDoNothing()
+        .run();
+      links++;
+    }
   }
-  return linked;
+  return { paths: updated, links };
+}
+
+/** Ordre de parcours : chaque segment est placé par la projection de son milieu sur le tracé. */
+function orderSegmentsAlong<T extends { coordinates: [number, number][] }>(rows: readonly T[], geometry: readonly [number, number][]): T[] {
+  if (geometry.length < 2) return [...rows];
+  const cumulative = cumulativeDistances(geometry);
+  return [...rows]
+    .map((row) => {
+      const middle = row.coordinates[Math.floor(row.coordinates.length / 2)];
+      const projection = middle ? projectOnPolyline({ lng: middle[0], lat: middle[1] }, geometry, cumulative) : null;
+      return { row, along: projection?.along ?? 0 };
+    })
+    .sort((a, b) => a.along - b.along)
+    .map((entry) => entry.row);
 }
 
 function insertUsers(): Map<string, UserRow> {
@@ -882,7 +930,7 @@ export function seedDemo(): { users: number; reports: number; alerts: number } {
 }
 
 /** Réinitialise toutes les données et rejoue le jeu de démonstration complet. */
-export function seedAll(): { areas: number; trails: number; waterPoints: number; paths: number; users: number; reports: number; alerts: number } {
+export function seedAll(): { areas: number; trails: number; waterPoints: number; paths: number; links: number; users: number; reports: number; alerts: number } {
   runMigrations(sqlite);
   return db.transaction(() => {
     wipe();
@@ -922,7 +970,7 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 if (isMain) {
   const result = seedAll();
   console.log(
-    `[seed] Corse : ${result.areas} lieux, ${result.trails} sentiers, ${result.paths} segments de chemins, ${result.waterPoints} points d'eau, ${result.users} comptes, ${result.reports} signalements, ${result.alerts} alertes officielles.`,
+    `[seed] Corse : ${result.areas} lieux, ${result.trails} sentiers, ${result.paths} segments de chemins (${result.links} associations randonnée ↔ segment), ${result.waterPoints} points d'eau, ${result.users} comptes, ${result.reports} signalements, ${result.alerts} alertes officielles.`,
   );
   console.log(`[seed] Comptes de démo (mot de passe « ${DEMO_PASSWORD} ») :`);
   for (const a of DEMO_ACCOUNTS) console.log(`  - ${a.email.padEnd(34)} ${a.label}`);

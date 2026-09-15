@@ -14,6 +14,7 @@ import { Badge, Button, Chip, EmptyState, Field, Stat, Textarea, toast } from "@
 import { api, ApiError } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
 import { formatDateTime } from "@/lib/format";
+import { NetworkHealthPanel } from "@/features/network/NetworkHealth";
 
 const KINDS = ["new_trail", "geometry", "variant", "slow_zone", "turnaround", "confusion", "inactive"] as const;
 
@@ -74,6 +75,8 @@ export function NetworkTab() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="admin-network">
+      {/* Ce que contient la base, avant tout arbitrage sur ce qu'elle propose. */}
+      <NetworkHealthPanel />
       <div className="flex flex-wrap items-center gap-2">
         <Chip selected={kind === null} onClick={() => setKind(null)}>
           {fr.common.all}

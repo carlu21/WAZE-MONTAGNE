@@ -1,9 +1,14 @@
 /**
- * Réseau de chemins de démonstration (Corse) : les sentiers du jeu de données
+ * Réseau de chemins de DÉMONSTRATION (Corse) : les sentiers du jeu de données
  * densifiés (un sommet tous les 25 m), plus quelques embranchements dessinés à
  * la main autour des secteurs de test (Restonica, Vizzavona, Bavella, Vergio)
  * afin d'exercer le map matching aux intersections. Les vraies données
  * viennent de l'import OpenStreetMap (`pnpm geo:import-osm`).
+ *
+ * Ces segments sortent d'ici marqués `source: "seed"` et SANS `sourceFeatureId` :
+ * ils ne correspondent à aucun objet cartographique réel. C'est ce qui permet à
+ * `isSurveyed()` de les écarter, et donc à l'application de ne jamais les
+ * présenter comme des sentiers relevés.
  */
 import { haversineM, type LngLat, type PathKind, type PathSegment } from "@mountain-live/core";
 import { splitAtSharedNodes, type RawWay } from "../services/paths";

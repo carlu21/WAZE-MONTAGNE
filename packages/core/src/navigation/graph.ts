@@ -201,5 +201,6 @@ export function makeSegment(id: string, coordinates: LngLat[], meta: Partial<Omi
     elevations: meta.elevations ?? null,
     lengthM: Math.round(lengthM),
     source: meta.source ?? "local",
+    sourceFeatureId: meta.sourceFeatureId ?? null,
   };
 }
