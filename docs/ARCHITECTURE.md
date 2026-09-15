@@ -166,6 +166,30 @@ Trois mécanismes complémentaires :
 - `apps/web` : composants du design system (icônes de la taxonomie résolues, badges, boutons, coquille), GeoJSON et filtre de zoom, état de l'assistant, confirmation, partage, formulaire d'inscription, tuiles hors connexion, moteur d'alertes, CSV/graphiques.
 - Parcours de bout en bout (Chromium headless 390×844) : onboarding → carte → recherche → filtres → fiche → autour de moi → explorer → connexion → publication → confirmation → profil → préférences → notifications → hors connexion → back-office → tableau de bord pro.
 
+## Collecte des données existantes
+
+La carte ne part pas de rien. Une couche de collecte alimente le réseau à partir de sources externes, sous contrainte de droits :
+
+```
+sources externes (OSM, open data, gestionnaires, GPX autorisés)
+        │
+        ▼
+ registre `data_sources` ──► vérification HUMAINE des conditions ──► droits dérivés de la licence
+        │                                  │
+        │                                  └─► robots.txt respecté avant toute récupération
+        ▼
+ bibliothèque `imported_traces` (fichier d'origine conservé)
+        │
+        ├─► qualité (`sources/trace-quality.ts`)
+        ├─► comparaison entre sources (`sources/compare.ts`) ──► corridors, doublons, variantes
+        └─► rattachement (`sources/knowledge.ts`) ──► l'itinéraire devient une suite de SEGMENTS
+                                                          │
+                                                          ▼
+                                       `segment_attestations` ──► confiance explicable 0–100
+```
+
+Le principe qui structure cette couche : **un GPX est une observation, pas la vérité**. Rien n'écrase une géométrie ; les couches coexistent (officielle, OSM, GPX importé, communautaire, observée) et la meilleure est choisie à l'affichage, avec sa raison. Détails : [SOURCES_GPX.md](SOURCES_GPX.md).
+
 ## Extensions prévues
 
 - **Itinéraires (section 13)** : `trails` en base (LineString), `distanceToPolylineM` et `pointsAlongLine` dans `core/geo.ts`, notification `new_danger_on_route` déjà typée ; il reste le calcul d'itinéraire, le profil altimétrique et l'écran.

@@ -31,6 +31,9 @@ import { formatDateTime } from "@/lib/format";
 import { BarChart } from "@/features/admin/charts";
 import { GeometryPicker, type AlertGeometry } from "@/features/admin/GeometryPicker";
 import { NetworkTab } from "@/features/admin/NetworkTab";
+import { SourcesTab } from "@/features/collect/SourcesTab";
+import { TerritoryTab } from "@/features/collect/TerritoryTab";
+import { TracesTab } from "@/features/collect/TracesTab";
 
 const TABS = [
   { to: "", label: "Tableau de bord", end: true },
@@ -39,6 +42,9 @@ const TABS = [
   { to: "users", label: fr.moderation.admin.users },
   { to: "alerts", label: fr.moderation.admin.alerts },
   { to: "network", label: fr.network.candidates.title },
+  { to: "traces", label: "Bibliothèque GPX" },
+  { to: "sources", label: "Sources" },
+  { to: "territories", label: "Territoires" },
 ];
 const PAGE_SIZE = 20;
 const STATUSES = Object.keys(STATUS_LABELS) as ReportStatus[];
@@ -78,6 +84,9 @@ export default function AdminPage() {
             <Route path="users" element={<UsersTab />} />
             <Route path="alerts" element={<AlertsTab />} />
             <Route path="network" element={<NetworkTab />} />
+            <Route path="traces" element={<TracesTab />} />
+            <Route path="sources" element={<SourcesTab />} />
+            <Route path="territories" element={<TerritoryTab />} />
             <Route path="*" element={<Navigate to="" replace />} />
           </Routes>
         </div>

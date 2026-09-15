@@ -21,6 +21,7 @@ import {
   type RoutingSegmentInput,
   type SegmentDetail,
   type SegmentNote,
+  type SegmentSourcesResponse,
   type SegmentStatistics,
   type SegmentTimeDto,
   type TraversalDirection,
@@ -34,6 +35,7 @@ import { HttpError } from "../services/errors";
 import { boundsOf, segmentsInBBox } from "../services/network-graph";
 import { countOpenByKind, listCandidates } from "../services/network-learning";
 import { coverageInBBox, heatmap, overallStatistics, publishableStatistics, rowToStatistics } from "../services/network-stats";
+import { knowledgeCard, sourcesOf } from "../services/segment-knowledge";
 import { toPathSegment } from "../services/paths";
 import { listVisibleReports } from "../services/reports";
 import { nowIso } from "../services/util";
@@ -144,6 +146,42 @@ networkRoutes.get("/segments/:id", (c) => {
     reportCount,
     notes,
   };
+  return c.json(body);
+});
+
+/**
+ * Provenance et fiabilité d'un chemin (section 30 du cahier des charges GPX) :
+ * d'où vient cette géométrie, qui l'atteste, quels itinéraires l'empruntent,
+ * quelle confiance lui accorder — et, seulement au-delà du seuil d'anonymat,
+ * ce que l'usage réel en dit.
+ */
+networkRoutes.get("/segments/:id/sources", (c) => {
+  const id = c.req.param("id");
+  const card = knowledgeCard(id);
+  if (!card) throw new HttpError(404, "not_found", "Chemin introuvable");
+  const sources = sourcesOf(id);
+  const attributions = sources
+    .map((s) => s.attribution ?? `${s.name} (${s.licence})`)
+    .filter((v, i, arr) => arr.indexOf(v) === i);
+  const body: SegmentSourcesResponse = {
+    segmentId: id,
+    name: card.name,
+    geometry: card.geometry,
+    confidence: card.confidence,
+    sources: sources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      type: s.type as SegmentSourcesResponse["sources"][number]["type"],
+      licence: s.licence as SegmentSourcesResponse["sources"][number]["licence"],
+      attribution: s.attribution,
+    })),
+    itineraries: card.itineraries.map((i) => ({ id: i.id, name: i.name })),
+    lastValidatedAt: card.lastValidatedAt ? new Date(card.lastValidatedAt).toISOString() : null,
+    usage: card.usage,
+    summary: card.summary,
+    attributions,
+  };
+  c.header("Cache-Control", "public, max-age=300");
   return c.json(body);
 });
 

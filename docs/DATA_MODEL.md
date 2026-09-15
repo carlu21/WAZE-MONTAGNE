@@ -78,6 +78,21 @@ erDiagram
 
 Index : (`lat`, `lng`), `status`, `expires_at`, `category`, `created_at`, `user_id`, `client_id`.
 
+### Collecte des sources existantes (migration 5)
+
+| Table | Rôle | Champs notables |
+| --- | --- | --- |
+| `data_sources` | **registre des sources** : d'où vient chaque chemin | `type` (open_data, institutional, osm, geotrek, platform, club, partner_api, user_upload), `licence`, `commercial_reuse_allowed` / `redistribution_allowed` / `attribution_required` (**dérivés de la licence, jamais saisis**), `api_available`, `api_url`, `last_checked_at` + `checked_by` (vérification humaine, nulle par défaut), `reliability_score`, `status` (review_required par défaut) |
+| `territories` | territoires de déploiement, du pays à la commune | `parent_id`, `aliases` (JSON : massifs, sommets, refuges — matière des requêtes), emprise |
+| `source_discoveries` | ressources repérées, **avant toute décision** | `format`, `has_gpx_file`, `licence`, `status`, `reason`, `reviewed_by` / `reviewed_at` |
+| `imported_traces` | bibliothèque des traces | géométrie normalisée, `breaks` (coupures préservées), `quality_score` / `quality_level` / `quality_flags`, `matched_ratio`, `geometry_hash` (doublons), `duplicate_of`, `licence`, `attribution`, `status`, `version` |
+| `imported_trace_files` | **fichier d'origine conservé tel quel**, par version | `content`, `checksum`, `byte_size` |
+| `trace_versions` | historique quand la source change (section 20) | `coordinates` de la version sortante, `changed_m`, `reason` |
+| `trace_segments` | l'itinéraire résolu en suite de segments | `seq`, `segment_id`, `reversed`, `distance_m`, `coverage`, `deviation_m` |
+| `segment_attestations` | qui atteste qu'un segment existe | `layer` (official, osm, imported_gpx, community, observed), `source_id`, `trace_id`, `deviation_m` ; index unique (segment, couche, source, trace) — **une même source ne compte qu'une fois** |
+
+`paths` porte en plus : `source_id`, `geometry_layer`, `trail_confidence` (0–100), `source_count`, `trace_count`, `last_validated_at`.
+
 ## Statuts et transitions
 
 Voir [ARCHITECTURE.md](ARCHITECTURE.md#cycle-de-vie-dun-signalement-corelifecyclets). Les statuts **visibles** sur la carte sont `active`, `confirmed`, `probably_resolved`, `disputed` (non expirés). `resolved` et `expired` restent consultables par leur identifiant et dans le back-office ; `deleted` n'est visible que des modérateurs.

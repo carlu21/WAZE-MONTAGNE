@@ -34,4 +34,10 @@ export const qk = {
   networkOverview: (p: Record<string, unknown>) => ["networkOverview", p] as const,
   networkCandidates: (p: Record<string, unknown>) => ["networkCandidates", p] as const,
   privacyZones: ["privacyZones"] as const,
+  // Collecte des traces existantes (back-office).
+  collectSources: (p: Record<string, unknown>) => ["collectSources", p] as const,
+  collectTraces: (p: Record<string, unknown>) => ["collectTraces", p] as const,
+  collectTerritories: ["collectTerritories"] as const,
+  collectPlan: (id: string) => ["collectPlan", id] as const,
+  segmentSources: (id: string) => ["segmentSources", id] as const,
 };

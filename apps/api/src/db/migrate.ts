@@ -509,6 +509,185 @@ const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS privacy_zones_user_idx ON privacy_zones(user_id)`,
     ],
   },
+  {
+    version: 5,
+    name: "collecte des traces GPX existantes (sources, découvertes, bibliothèque, attestations)",
+    statements: [
+      // --- Registre des sources (section 4) : d'où vient chaque chemin ---
+      `CREATE TABLE IF NOT EXISTS data_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        type TEXT NOT NULL,
+        country TEXT NOT NULL DEFAULT 'FR',
+        territory TEXT,
+        licence TEXT NOT NULL DEFAULT 'unknown',
+        licence_url TEXT,
+        commercial_reuse_allowed INTEGER,
+        redistribution_allowed INTEGER,
+        attribution_required INTEGER,
+        attribution_text TEXT,
+        api_available INTEGER NOT NULL DEFAULT 0,
+        api_url TEXT,
+        last_checked_at TEXT,
+        checked_by TEXT,
+        reliability_score REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'review_required',
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS data_sources_status_idx ON data_sources(status)`,
+      `CREATE INDEX IF NOT EXISTS data_sources_territory_idx ON data_sources(territory)`,
+
+      // --- Territoires de déploiement (section 16) ---
+      `CREATE TABLE IF NOT EXISTS territories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        country TEXT NOT NULL DEFAULT 'FR',
+        parent_id TEXT,
+        aliases TEXT NOT NULL DEFAULT '[]',
+        min_lat REAL,
+        min_lng REAL,
+        max_lat REAL,
+        max_lng REAL,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS territories_parent_idx ON territories(parent_id)`,
+
+      // --- Ressources repérées par la découverte, avant toute décision (section 5) ---
+      `CREATE TABLE IF NOT EXISTS source_discoveries (
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        title TEXT,
+        source_id TEXT,
+        territory TEXT,
+        activity TEXT NOT NULL DEFAULT 'all',
+        format TEXT NOT NULL DEFAULT 'unknown',
+        has_gpx_file INTEGER NOT NULL DEFAULT 0,
+        licence TEXT NOT NULL DEFAULT 'unknown',
+        status TEXT NOT NULL DEFAULT 'review_required',
+        reason TEXT,
+        query TEXT,
+        discovered_at TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        notes TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS source_discoveries_status_idx ON source_discoveries(status)`,
+      `CREATE INDEX IF NOT EXISTS source_discoveries_territory_idx ON source_discoveries(territory)`,
+
+      // --- Bibliothèque des traces importées (sections 7, 15, 20) ---
+      `CREATE TABLE IF NOT EXISTS imported_traces (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        source_id TEXT,
+        discovery_id TEXT,
+        origin TEXT NOT NULL,
+        origin_url TEXT,
+        file_name TEXT,
+        format TEXT NOT NULL,
+        licence TEXT NOT NULL DEFAULT 'unknown',
+        attribution TEXT,
+        territory TEXT,
+        activity TEXT NOT NULL DEFAULT 'all',
+        coordinates TEXT NOT NULL,
+        elevations TEXT,
+        times TEXT,
+        breaks TEXT NOT NULL DEFAULT '[]',
+        waypoints TEXT NOT NULL DEFAULT '[]',
+        metadata TEXT NOT NULL DEFAULT '{}',
+        length_m INTEGER NOT NULL DEFAULT 0,
+        elevation_gain_m REAL,
+        elevation_loss_m REAL,
+        min_lat REAL NOT NULL,
+        min_lng REAL NOT NULL,
+        max_lat REAL NOT NULL,
+        max_lng REAL NOT NULL,
+        quality_score REAL,
+        quality_level TEXT,
+        quality_flags TEXT NOT NULL DEFAULT '[]',
+        matched_ratio REAL,
+        geometry_hash TEXT,
+        duplicate_of TEXT,
+        status TEXT NOT NULL DEFAULT 'review_required',
+        version INTEGER NOT NULL DEFAULT 1,
+        recorded_at TEXT,
+        imported_at TEXT NOT NULL,
+        imported_by TEXT,
+        reviewed_by TEXT,
+        reviewed_at TEXT,
+        review_note TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS imported_traces_status_idx ON imported_traces(status)`,
+      `CREATE INDEX IF NOT EXISTS imported_traces_bbox_idx ON imported_traces(min_lat, min_lng)`,
+      `CREATE INDEX IF NOT EXISTS imported_traces_hash_idx ON imported_traces(geometry_hash)`,
+      `CREATE INDEX IF NOT EXISTS imported_traces_source_idx ON imported_traces(source_id)`,
+
+      // --- Fichier d'origine conservé tel quel (section 7 : ORIGINAL_GPX_FILE) ---
+      `CREATE TABLE IF NOT EXISTS imported_trace_files (
+        trace_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        byte_size INTEGER NOT NULL,
+        checksum TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        PRIMARY KEY (trace_id, version)
+      )`,
+
+      // --- Versions successives d'une trace (section 20) ---
+      `CREATE TABLE IF NOT EXISTS trace_versions (
+        id TEXT PRIMARY KEY,
+        trace_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        coordinates TEXT NOT NULL,
+        length_m INTEGER NOT NULL DEFAULT 0,
+        quality_score REAL,
+        changed_m REAL,
+        reason TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS trace_versions_trace_idx ON trace_versions(trace_id, version)`,
+
+      // --- Rattachement d'un itinéraire importé au réseau (section 6) ---
+      `CREATE TABLE IF NOT EXISTS trace_segments (
+        trace_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        segment_id TEXT NOT NULL,
+        reversed INTEGER NOT NULL DEFAULT 0,
+        distance_m REAL NOT NULL DEFAULT 0,
+        coverage REAL NOT NULL DEFAULT 0,
+        deviation_m REAL,
+        PRIMARY KEY (trace_id, seq)
+      )`,
+      `CREATE INDEX IF NOT EXISTS trace_segments_segment_idx ON trace_segments(segment_id)`,
+
+      // --- Qui atteste qu'un segment existe, et avec quel poids (sections 11, 12) ---
+      `CREATE TABLE IF NOT EXISTS segment_attestations (
+        id TEXT PRIMARY KEY,
+        segment_id TEXT NOT NULL,
+        layer TEXT NOT NULL,
+        source_id TEXT,
+        trace_id TEXT,
+        deviation_m REAL,
+        observed_at TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS segment_attestations_unique_idx
+         ON segment_attestations(segment_id, layer, COALESCE(source_id, ''), COALESCE(trace_id, ''))`,
+      `CREATE INDEX IF NOT EXISTS segment_attestations_segment_idx ON segment_attestations(segment_id)`,
+
+      // --- Confiance et provenance portées par le segment (sections 12, 21, 30) ---
+      `ALTER TABLE paths ADD COLUMN source_id TEXT`,
+      `ALTER TABLE paths ADD COLUMN geometry_layer TEXT`,
+      `ALTER TABLE paths ADD COLUMN trail_confidence REAL`,
+      `ALTER TABLE paths ADD COLUMN source_count INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE paths ADD COLUMN trace_count INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE paths ADD COLUMN last_validated_at TEXT`,
+      `CREATE INDEX IF NOT EXISTS paths_source_idx ON paths(source_id)`,
+    ],
+  },
 ];
 
 /** Applique toutes les migrations manquantes. Sans effet si la base est à jour. */

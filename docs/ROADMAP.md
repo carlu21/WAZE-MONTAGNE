@@ -6,6 +6,14 @@
 
 ## Prochaines étapes (par priorité)
 
+### Brancher la collecte sur des sources réelles
+L'infrastructure est livrée (registre, licences, robots.txt, ingestion GPX/KML/GeoJSON, qualité, comparaison, rattachement, back-office). Il manque un environnement disposant d'un accès réseau sortant pour :
+1. importer le réseau OpenStreetMap des territoires pilotes (Overpass, déjà écrit et testé) ;
+2. recenser les instances Geotrek des gestionnaires et relever leurs conditions ;
+3. vérifier, une par une, les licences des jeux de données ouverts visés ;
+4. trancher la question du partage à l'identique (ODbL, CC BY-SA) sur nos dérivés.
+Tableau des sources à connecter : [SOURCES_GPX.md](SOURCES_GPX.md).
+
 1. **Pilote terrain en Corse** : recueil des retours des randonneurs, bergers, sociétés de chasse, communes ; ajustement des durées de vie et des seuils de confiance à partir des données réelles.
 2. **Navigation, suite** : calcul d'itinéraire départ → arrivée sur le graphe des chemins (routage par pratique), altitudes des sentiers par MNT (IGN RGE ALTI / SRTM) pour les profils et « Forte pente », suivi en arrière-plan natif, balises BLE (refuges, intersections) et sources Bluetooth (montre, GNSS externe) via `PositionSource`, alertes `new_danger_on_route` sur itinéraires enregistrés.
 3. **Notifications push** (Web Push puis natif) pour les types déjà définis, avec les préférences existantes.

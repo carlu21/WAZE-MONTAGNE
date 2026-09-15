@@ -21,6 +21,7 @@ import {
 import { Badge, BottomSheet, Divider, RelativeTime, SkeletonText, type BadgeTone } from "@/components/ui";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
+import { SegmentProvenance } from "./SegmentProvenance";
 
 /** Plus la confiance est élevée, plus le chiffre est mis en avant (section 26). */
 const CONFIDENCE_TONE: Record<TimeConfidence, BadgeTone> = {
@@ -155,6 +156,8 @@ export function SegmentSheet({ segmentId, onClose }: SegmentSheetProps) {
                 {data.reportCount} {fr.network.segment.reports.toLowerCase()} à proximité
               </p>
             ) : null}
+
+            {segmentId ? <SegmentProvenance segmentId={segmentId} /> : null}
           </>
         )}
       </div>

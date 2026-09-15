@@ -13,6 +13,8 @@ import { sqlite } from "./db/client";
 import type { AppEnv } from "./middleware/auth";
 import { activitiesRoutes } from "./routes/activities";
 import { adminNetworkRoutes } from "./routes/admin-network";
+import { adminSourcesRoutes } from "./routes/admin-sources";
+import { adminTracesRoutes } from "./routes/admin-traces";
 import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { communityRoutes } from "./routes/community";
@@ -96,6 +98,8 @@ export function createApp() {
   api.route("/offline", offlineRoutes);
   api.route("/community", communityRoutes);
   api.route("/admin/network", adminNetworkRoutes);
+  api.route("/admin/traces", adminTracesRoutes);
+  api.route("/admin/collect", adminSourcesRoutes);
   api.route("/admin", adminRoutes);
   api.route("/pro", proRoutes);
 

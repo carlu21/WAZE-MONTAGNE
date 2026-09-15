@@ -70,6 +70,18 @@ L'application s'ouvre sur **« Démarrer un itinéraire »**. Le module de navig
 
 Détails (algorithme, seuils, données, Bluetooth) : [docs/NAVIGATION_GPS.md](docs/NAVIGATION_GPS.md).
 
+## Ne pas démarrer avec une carte vide
+
+Avant que la communauté n'enregistre ses propres déplacements, l'application constitue une base de départ à partir de ce qui existe déjà : réseau vectoriel OpenStreetMap, données ouvertes, itinéraires de gestionnaires d'espaces naturels, traces GPX **dont la licence autorise la réutilisation**.
+
+Le fichier GPX n'est pas l'objet : c'est une observation qui enrichit un **segment de chemin**. Une trace importée est analysée, notée, comparée aux autres sources, puis résolue en suite de segments — « cet itinéraire emprunte les chemins 112, 113, 245 ». Chaque segment sait alors qui l'atteste, avec quelle confiance, et pour quelles raisons.
+
+Rien n'entre sans droits vérifiés : une source naît « à vérifier », ses droits sont dérivés de sa licence, le `robots.txt` des sites est respecté, et une licence inconnue envoie la trace en revue au lieu de l'intégrer. Détails et sources à connecter : [docs/SOURCES_GPX.md](docs/SOURCES_GPX.md).
+
+```bash
+pnpm --filter @mountain-live/api db:seed-sources   # territoires pilotes et pistes de sources à vérifier
+```
+
 ## Le réseau vivant
 
 Les activités enregistrées, lorsque leur auteur choisit de contribuer, apprennent à l'application **comment la montagne est réellement parcourue** : fréquentation de chaque chemin, temps réellement observés par activité et par sens, tracés à corriger, chemins absents des cartes, ralentissements, demi-tours, intersections où l'on se trompe. De là viennent la carte de fréquentation, la fiche d'un chemin, et les itinéraires proposés entre deux points (le plus rapide, le plus court, le plus emprunté, le plus facile).
@@ -128,5 +140,5 @@ Variables d'environnement de l'API (voir `apps/api/.env.example`) : `PORT`, `JWT
 
 - [Cahier des charges](docs/CAHIER_DES_CHARGES.md)
 - [Architecture](docs/ARCHITECTURE.md) · [Navigation et parcours](docs/NAVIGATION.md) · [Modèle de données](docs/DATA_MODEL.md)
-- [Sécurité et vie privée](docs/SECURITY_PRIVACY.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Mobile et Capacitor](docs/MOBILE.md)
+- [Collecte des traces existantes](docs/SOURCES_GPX.md) · [Sécurité et vie privée](docs/SECURITY_PRIVACY.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Mobile et Capacitor](docs/MOBILE.md)
 - [Feuille de route](docs/ROADMAP.md) · [Contribuer](CONTRIBUTING.md)

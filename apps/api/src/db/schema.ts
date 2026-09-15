@@ -23,6 +23,14 @@ import type {
   PathKind,
   PathSource,
   TraversalDirection,
+  GeometryLayer,
+  GpxQualityLevel,
+  LicenceId,
+  ReuseStatus,
+  SourceStatus,
+  SourceType,
+  TraceMetadata,
+  TraceWaypoint,
 } from "@mountain-live/core";
 
 /**
@@ -300,6 +308,18 @@ export const paths = sqliteTable(
     passageCount: integer("passage_count").notNull().default(0),
     lastPassageAt: text("last_passage_at"),
     popularityScore: real("popularity_score").notNull().default(0),
+    // --- Collecte des sources existantes (migration 5) ---
+    /** Source principale de cette géométrie (registre `data_sources`). */
+    sourceId: text("source_id"),
+    /** Couche dont provient la géométrie retenue (section 21). */
+    geometryLayer: text("geometry_layer").$type<GeometryLayer | null>(),
+    /** Confiance 0..100 agrégée de toutes les attestations (section 12). */
+    trailConfidence: real("trail_confidence"),
+    /** Sources distinctes attestant ce segment. */
+    sourceCount: integer("source_count").notNull().default(0),
+    /** Traces importées distinctes l'empruntant. */
+    traceCount: integer("trace_count").notNull().default(0),
+    lastValidatedAt: text("last_validated_at"),
     /** Version de géométrie courante (historique dans segment_versions). */
     version: integer("version").notNull().default(1),
   },
@@ -701,6 +721,213 @@ export const privacyZones = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/* Collecte des traces GPX existantes (migration 5)                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Registre des sources de données (section 4 du cahier des charges GPX).
+ * Chaque géométrie importée pointe ici : on doit toujours pouvoir répondre à
+ * « d'où vient ce chemin ? ». `lastCheckedAt` à null signifie « conditions
+ * jamais vérifiées par un humain » — et bloque l'importation automatique.
+ */
+export const dataSources = sqliteTable(
+  "data_sources",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    type: text("type").$type<SourceType>().notNull(),
+    country: text("country").notNull().default("FR"),
+    territory: text("territory"),
+    licence: text("licence").$type<LicenceId>().notNull().default("unknown"),
+    licenceUrl: text("licence_url"),
+    commercialReuseAllowed: integer("commercial_reuse_allowed", { mode: "boolean" }),
+    redistributionAllowed: integer("redistribution_allowed", { mode: "boolean" }),
+    attributionRequired: integer("attribution_required", { mode: "boolean" }),
+    attributionText: text("attribution_text"),
+    apiAvailable: integer("api_available", { mode: "boolean" }).notNull().default(false),
+    apiUrl: text("api_url"),
+    lastCheckedAt: text("last_checked_at"),
+    checkedBy: text("checked_by"),
+    reliabilityScore: real("reliability_score").notNull().default(0),
+    status: text("status").$type<SourceStatus>().notNull().default("review_required"),
+    notes: text("notes"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("data_sources_status_idx").on(t.status), index("data_sources_territory_idx").on(t.territory)],
+);
+
+/** Territoires de déploiement, du pays à la commune (section 16). */
+export const territories = sqliteTable(
+  "territories",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    country: text("country").notNull().default("FR"),
+    parentId: text("parent_id"),
+    aliases: text("aliases", { mode: "json" }).$type<string[]>().notNull().default([]),
+    minLat: real("min_lat"),
+    minLng: real("min_lng"),
+    maxLat: real("max_lat"),
+    maxLng: real("max_lng"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("territories_parent_idx").on(t.parentId)],
+);
+
+/** Ressource repérée par la découverte, avant toute décision (section 5). */
+export const sourceDiscoveries = sqliteTable(
+  "source_discoveries",
+  {
+    id: text("id").primaryKey(),
+    url: text("url").notNull(),
+    title: text("title"),
+    sourceId: text("source_id"),
+    territory: text("territory"),
+    activity: text("activity").notNull().default("all"),
+    format: text("format").$type<"gpx" | "kml" | "geojson" | "api" | "unknown">().notNull().default("unknown"),
+    hasGpxFile: integer("has_gpx_file", { mode: "boolean" }).notNull().default(false),
+    licence: text("licence").$type<LicenceId>().notNull().default("unknown"),
+    status: text("status").$type<ReuseStatus>().notNull().default("review_required"),
+    reason: text("reason"),
+    query: text("query"),
+    discoveredAt: text("discovered_at").notNull(),
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: text("reviewed_at"),
+    notes: text("notes"),
+  },
+  (t) => [index("source_discoveries_status_idx").on(t.status), index("source_discoveries_territory_idx").on(t.territory)],
+);
+
+/** Comment une trace est entrée dans la bibliothèque. */
+export type TraceOrigin = "manual_upload" | "url_import" | "api_import" | "discovery";
+export type TraceStatus = "review_required" | "approved" | "rejected" | "merged";
+
+/** Bibliothèque des traces importées (sections 7, 15, 20). */
+export const importedTraces = sqliteTable(
+  "imported_traces",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    description: text("description"),
+    sourceId: text("source_id"),
+    discoveryId: text("discovery_id"),
+    origin: text("origin").$type<TraceOrigin>().notNull(),
+    originUrl: text("origin_url"),
+    fileName: text("file_name"),
+    format: text("format").$type<"gpx" | "kml" | "geojson">().notNull(),
+    licence: text("licence").$type<LicenceId>().notNull().default("unknown"),
+    attribution: text("attribution"),
+    territory: text("territory"),
+    activity: text("activity").notNull().default("all"),
+    coordinates: text("coordinates", { mode: "json" }).$type<[number, number][]>().notNull(),
+    elevations: text("elevations", { mode: "json" }).$type<number[] | null>(),
+    times: text("times", { mode: "json" }).$type<number[] | null>(),
+    breaks: text("breaks", { mode: "json" }).$type<number[]>().notNull().default([]),
+    waypoints: text("waypoints", { mode: "json" }).$type<TraceWaypoint[]>().notNull().default([]),
+    metadata: text("metadata", { mode: "json" }).$type<TraceMetadata | Record<string, never>>().notNull().default({}),
+    lengthM: integer("length_m").notNull().default(0),
+    elevationGainM: real("elevation_gain_m"),
+    elevationLossM: real("elevation_loss_m"),
+    minLat: real("min_lat").notNull(),
+    minLng: real("min_lng").notNull(),
+    maxLat: real("max_lat").notNull(),
+    maxLng: real("max_lng").notNull(),
+    qualityScore: real("quality_score"),
+    qualityLevel: text("quality_level").$type<GpxQualityLevel | null>(),
+    qualityFlags: text("quality_flags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** Part de la trace rattachée au réseau connu (section 6). */
+    matchedRatio: real("matched_ratio"),
+    /** Empreinte géométrique : repère la même trace récupérée deux fois. */
+    geometryHash: text("geometry_hash"),
+    duplicateOf: text("duplicate_of"),
+    status: text("status").$type<TraceStatus>().notNull().default("review_required"),
+    version: integer("version").notNull().default(1),
+    recordedAt: text("recorded_at"),
+    importedAt: text("imported_at").notNull(),
+    importedBy: text("imported_by"),
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: text("reviewed_at"),
+    reviewNote: text("review_note"),
+  },
+  (t) => [
+    index("imported_traces_status_idx").on(t.status),
+    index("imported_traces_bbox_idx").on(t.minLat, t.minLng),
+    index("imported_traces_hash_idx").on(t.geometryHash),
+    index("imported_traces_source_idx").on(t.sourceId),
+  ],
+);
+
+/**
+ * Fichier d'origine conservé tel quel (section 7 : ORIGINAL_GPX_FILE).
+ * On ne republie jamais un fichier dont la licence l'interdit ; on le garde
+ * pour pouvoir rejouer l'analyse et prouver la provenance.
+ */
+export const importedTraceFiles = sqliteTable(
+  "imported_trace_files",
+  {
+    traceId: text("trace_id").notNull(),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    checksum: text("checksum").notNull(),
+    fetchedAt: text("fetched_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.traceId, t.version] })],
+);
+
+/** Versions successives d'une trace officielle qui change à la source (section 20). */
+export const traceVersions = sqliteTable(
+  "trace_versions",
+  {
+    id: text("id").primaryKey(),
+    traceId: text("trace_id").notNull(),
+    version: integer("version").notNull(),
+    coordinates: text("coordinates", { mode: "json" }).$type<[number, number][]>().notNull(),
+    lengthM: integer("length_m").notNull().default(0),
+    qualityScore: real("quality_score"),
+    /** Ampleur de la modification par rapport à la version précédente (m). */
+    changedM: real("changed_m"),
+    reason: text("reason"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("trace_versions_trace_idx").on(t.traceId, t.version)],
+);
+
+/** Segments empruntés par une trace importée (section 6). */
+export const traceSegments = sqliteTable(
+  "trace_segments",
+  {
+    traceId: text("trace_id").notNull(),
+    seq: integer("seq").notNull(),
+    segmentId: text("segment_id").notNull(),
+    reversed: integer("reversed", { mode: "boolean" }).notNull().default(false),
+    distanceM: real("distance_m").notNull().default(0),
+    coverage: real("coverage").notNull().default(0),
+    deviationM: real("deviation_m"),
+  },
+  (t) => [primaryKey({ columns: [t.traceId, t.seq] }), index("trace_segments_segment_idx").on(t.segmentId)],
+);
+
+/** Qui atteste qu'un segment existe, et depuis quelle couche (sections 11, 12). */
+export const segmentAttestations = sqliteTable(
+  "segment_attestations",
+  {
+    id: text("id").primaryKey(),
+    segmentId: text("segment_id").notNull(),
+    layer: text("layer").$type<GeometryLayer>().notNull(),
+    sourceId: text("source_id"),
+    traceId: text("trace_id"),
+    deviationM: real("deviation_m"),
+    observedAt: text("observed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("segment_attestations_segment_idx").on(t.segmentId)],
+);
+
+// ---------------------------------------------------------------------------
 // Types de lignes
 // ---------------------------------------------------------------------------
 
@@ -726,3 +953,11 @@ export type AreaRow = typeof areas.$inferSelect;
 export type NotificationRow = typeof notifications.$inferSelect;
 export type FlagRow = typeof moderationReports.$inferSelect;
 export type PartnerRow = typeof partners.$inferSelect;
+export type DataSourceRow = typeof dataSources.$inferSelect;
+export type TerritoryRow = typeof territories.$inferSelect;
+export type SourceDiscoveryRow = typeof sourceDiscoveries.$inferSelect;
+export type ImportedTraceRow = typeof importedTraces.$inferSelect;
+export type ImportedTraceFileRow = typeof importedTraceFiles.$inferSelect;
+export type TraceVersionRow = typeof traceVersions.$inferSelect;
+export type TraceSegmentRow = typeof traceSegments.$inferSelect;
+export type SegmentAttestationRow = typeof segmentAttestations.$inferSelect;

@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "geo:import": "tsx src/db/import-geonames.ts",
     "geo:import-osm": "tsx src/db/import-osm.ts",
-    "db:seed-activities": "tsx src/db/seed-activities-cli.ts"
+    "db:seed-activities": "tsx src/db/seed-activities-cli.ts",
+    "db:seed-sources": "tsx src/db/seed-sources-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",

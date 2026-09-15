@@ -305,3 +305,160 @@ export const privacyZoneSchema = z.object({
   radiusM: z.number().int().min(100).max(2000).default(250),
 });
 export type PrivacyZoneInput = z.infer<typeof privacyZoneSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Collecte des traces GPX existantes                                   */
+/* ------------------------------------------------------------------ */
+
+export const licenceIdSchema = z.enum([
+  "odbl",
+  "cc0",
+  "cc-by",
+  "cc-by-sa",
+  "cc-by-nc",
+  "cc-by-nc-sa",
+  "cc-by-nd",
+  "etalab-2.0",
+  "licence-ouverte-1.0",
+  "public-domain",
+  "proprietary",
+  "unknown",
+]);
+
+export const sourceTypeSchema = z.enum([
+  "open_data",
+  "institutional",
+  "osm",
+  "geotrek",
+  "platform",
+  "club",
+  "partner_api",
+  "user_upload",
+]);
+
+/** URL publique : seuls http et https, et jamais une adresse locale. */
+export const publicUrlSchema = z
+  .string()
+  .url()
+  .max(2000)
+  .refine((v) => /^https?:\/\//i.test(v), { message: "Seuls http et https sont acceptés" })
+  .refine((v) => {
+    try {
+      const host = new URL(v).hostname.toLowerCase();
+      // Une importation ne doit jamais servir à faire visiter le réseau interne
+      // au serveur (SSRF) : les adresses locales et privées sont refusées.
+      if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host.endsWith(".local")) return false;
+      if (/^(127|10)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) return false;
+      if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+      if (host === "0.0.0.0" || host === "::1" || host === "[::1]") return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }, { message: "Adresse non autorisée" });
+
+/** Déclaration d'une source dans le registre (section 4). */
+export const dataSourceSchema = z.object({
+  name: z.string().min(2).max(160),
+  url: publicUrlSchema,
+  type: sourceTypeSchema,
+  country: z.string().length(2).default("FR"),
+  territory: z.string().max(80).nullable().optional(),
+  licence: licenceIdSchema.default("unknown"),
+  licenceUrl: publicUrlSchema.nullable().optional(),
+  attributionText: z.string().max(300).nullable().optional(),
+  apiAvailable: z.boolean().default(false),
+  apiUrl: publicUrlSchema.nullable().optional(),
+  reliabilityScore: z.number().min(0).max(100).default(0),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export type DataSourceInput = z.infer<typeof dataSourceSchema>;
+
+/** Vérification humaine des conditions d'une source (section 5). */
+export const sourceReviewSchema = z.object({
+  status: z.enum(["approved", "review_required", "forbidden"]),
+  licence: licenceIdSchema.optional(),
+  licenceUrl: publicUrlSchema.nullable().optional(),
+  attributionText: z.string().max(300).nullable().optional(),
+  reliabilityScore: z.number().min(0).max(100).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export type SourceReviewInput = z.infer<typeof sourceReviewSchema>;
+
+/** Dépôt manuel d'un fichier (section 17). */
+export const traceUploadSchema = z.object({
+  /** Contenu du fichier. 8 Mo au maximum, contrôlé aussi côté service. */
+  content: z.string().min(20).max(8 * 1024 * 1024),
+  fileName: z.string().max(200).nullable().optional(),
+  sourceId: z.string().max(40).nullable().optional(),
+  territory: z.string().max(80).nullable().optional(),
+  activity: z.union([activityModeSchema, z.literal("all")]).default("all"),
+  licence: licenceIdSchema.optional(),
+  /** « Quelle est la provenance de cette trace ? » */
+  declaredOrigin: z.string().max(300).nullable().optional(),
+  /** « Disposez-vous des droits nécessaires pour la partager ? » */
+  declaredRights: z.boolean().default(false),
+});
+export type TraceUploadInput = z.infer<typeof traceUploadSchema>;
+
+/** Importation depuis une URL (section 18). */
+export const traceUrlImportSchema = z.object({
+  url: publicUrlSchema,
+  sourceId: z.string().max(40).nullable().optional(),
+  territory: z.string().max(80).nullable().optional(),
+  activity: z.union([activityModeSchema, z.literal("all")]).default("all"),
+  licence: licenceIdSchema.optional(),
+  declaredOrigin: z.string().max(300).nullable().optional(),
+  declaredRights: z.boolean().default(false),
+});
+export type TraceUrlImportInput = z.infer<typeof traceUrlImportSchema>;
+
+/** Décision humaine sur une trace de la bibliothèque (section 15). */
+export const traceReviewSchema = z.object({
+  status: z.enum(["approved", "rejected", "merged", "review_required"]),
+  licence: licenceIdSchema.optional(),
+  note: z.string().max(500).nullable().optional(),
+});
+export type TraceReviewInput = z.infer<typeof traceReviewSchema>;
+
+/** Filtres de la bibliothèque GPX (section 15). */
+export const traceLibraryQuerySchema = z.object({
+  territory: z.string().max(80).optional(),
+  activity: z.string().max(20).optional(),
+  sourceId: z.string().max(40).optional(),
+  licence: licenceIdSchema.optional(),
+  status: z.enum(["review_required", "approved", "rejected", "merged"]).optional(),
+  minQuality: z.coerce.number().min(0).max(100).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+export type TraceLibraryQuery = z.infer<typeof traceLibraryQuerySchema>;
+
+/** Comparaison de plusieurs traces d'un même parcours (section 10). */
+export const traceCompareSchema = z.object({
+  traceIds: z.array(z.string().max(40)).min(2).max(12),
+});
+export type TraceCompareInput = z.infer<typeof traceCompareSchema>;
+
+/** Territoire de déploiement (section 16). */
+export const territorySchema = z.object({
+  id: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/i, "Identifiant en lettres, chiffres et tirets").optional(),
+  name: z.string().min(2).max(120),
+  country: z.string().length(2).default("FR"),
+  parentId: z.string().max(60).nullable().optional(),
+  aliases: z.array(z.string().max(80)).max(30).default([]),
+  bbox: z
+    .object({ west: lngSchema, south: latSchema, east: lngSchema, north: latSchema })
+    .nullable()
+    .optional(),
+});
+export type TerritoryInput = z.infer<typeof territorySchema>;
+
+/** Lancement d'une campagne de découverte sur un territoire (section 16). */
+export const campaignSchema = z.object({
+  /** URL candidates à examiner. Le service n'interroge aucun moteur généraliste. */
+  urls: z.array(publicUrlSchema).max(50).default([]),
+});
+export type CampaignInput = z.infer<typeof campaignSchema>;

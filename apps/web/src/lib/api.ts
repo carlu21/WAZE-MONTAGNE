@@ -57,6 +57,28 @@ import {
   type CommentInput,
   type FlagInput,
   type OfficialAlertInput,
+  type CampaignInput,
+  type CampaignResponse,
+  type DataSourceDto,
+  type DataSourceInput,
+  type DiscoveredResource,
+  type DiscoveriesResponse,
+  type ImportTraceResponse,
+  type ImportedTraceDto,
+  type SegmentSourcesResponse,
+  type SourceReviewInput,
+  type SourcesResponse,
+  type TerritoriesResponse,
+  type TerritoryDto,
+  type TerritoryInput,
+  type TerritoryPlanResponse,
+  type TraceCompareInput,
+  type TraceComparisonResponse,
+  type TraceDetail,
+  type TraceReviewInput,
+  type TraceUploadInput,
+  type TraceUrlImportInput,
+  type TracesResponse,
 } from "@mountain-live/core";
 import { useSessionStore } from "@/store/session";
 
@@ -213,6 +235,7 @@ export const api = {
   },
   network: {
     segment: (id: string) => request<SegmentDetail>("GET", `/network/segments/${encodeURIComponent(id)}`),
+    segmentSources: (id: string) => request<SegmentSourcesResponse>("GET", `/network/segments/${encodeURIComponent(id)}/sources`),
     heatmap: (p: { bbox: BBox; period?: HeatmapPeriod; activity?: ActivityMode | "all" }) =>
       request<HeatmapResponse>("GET", `/network/heatmap${q({ bbox: bboxParam(p.bbox), period: p.period, activity: p.activity })}`),
     routes: (input: RoutePlanInput) => request<RoutePlanResponse>("POST", "/network/routes", input),
@@ -222,6 +245,33 @@ export const api = {
     reviewCandidate: (id: string, input: CandidateReviewInput) =>
       request<{ candidate: NetworkCandidateDto }>("PATCH", `/admin/network/candidates/${id}`, input),
     rebuild: () => request<{ processed: number; statistics: number; candidates: number }>("POST", "/admin/network/rebuild"),
+  },
+  /** Collecte des traces existantes (back-office) : sources, bibliothèque, territoires. */
+  collect: {
+    sources: (p: { status?: string; type?: string; territory?: string; limit?: number } = {}) =>
+      request<SourcesResponse>("GET", `/admin/collect/sources${q(p)}`),
+    createSource: (input: DataSourceInput) => request<{ source: DataSourceDto }>("POST", "/admin/collect/sources", input),
+    reviewSource: (id: string, input: SourceReviewInput) =>
+      request<{ source: DataSourceDto; attribution: string | null }>("PATCH", `/admin/collect/sources/${id}`, input),
+    discoveries: (p: { status?: string; territory?: string; limit?: number } = {}) =>
+      request<DiscoveriesResponse>("GET", `/admin/collect/discoveries${q(p)}`),
+    reviewDiscovery: (id: string, input: { status: string; notes?: string | null }) =>
+      request<{ discovery: DiscoveredResource }>("PATCH", `/admin/collect/discoveries/${id}`, input),
+    territories: () => request<TerritoriesResponse>("GET", "/admin/collect/territories"),
+    createTerritory: (input: TerritoryInput) => request<{ territory: TerritoryDto }>("POST", "/admin/collect/territories", input),
+    plan: (id: string) => request<TerritoryPlanResponse>("GET", `/admin/collect/territories/${encodeURIComponent(id)}/plan`),
+    discover: (id: string, input: CampaignInput) =>
+      request<CampaignResponse>("POST", `/admin/collect/territories/${encodeURIComponent(id)}/discover`, input),
+  },
+  /** Bibliothèque des traces importées (back-office). */
+  traces: {
+    list: (p: Record<string, string | number | undefined> = {}) => request<TracesResponse>("GET", `/admin/traces${q(p)}`),
+    detail: (id: string) => request<TraceDetail>("GET", `/admin/traces/${encodeURIComponent(id)}`),
+    upload: (input: TraceUploadInput) => request<ImportTraceResponse>("POST", "/admin/traces/upload", input),
+    importUrl: (input: TraceUrlImportInput) => request<ImportTraceResponse>("POST", "/admin/traces/import-url", input),
+    review: (id: string, input: TraceReviewInput) => request<{ trace: ImportedTraceDto; attested: number }>("PATCH", `/admin/traces/${id}`, input),
+    compare: (input: TraceCompareInput) => request<TraceComparisonResponse>("POST", "/admin/traces/compare", input),
+    remove: (id: string) => request<void>("DELETE", `/admin/traces/${id}`),
   },
   privacyZones: {
     list: () => request<{ zones: { id: string; label: string | null; lat: number; lng: number; radiusM: number }[] }>("GET", "/users/me/privacy-zones"),
