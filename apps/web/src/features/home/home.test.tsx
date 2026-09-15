@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import type { NearbyTrail } from "@mountain-live/core";
 import { TrailCard } from "./TrailCard";
 import { DURATION_FILTERS, filterByDuration } from "./HomeSheet";
+import { TrailPreviewSheet } from "./TrailPreviewSheet";
 
 /**
  * L'écran d'accueil promet une chose : comprendre immédiatement où l'on est et
@@ -121,5 +122,53 @@ describe("filtres de durée", () => {
 
   it("supporte une liste vide", () => {
     expect(filterByDuration([], "day")).toEqual([]);
+  });
+});
+
+/**
+ * La règle qui prime sur tout le reste : mieux vaut une fonction annoncée
+ * indisponible qu'une fonction techniquement fausse. Ces tests vérifient que la
+ * fiche refuse VISIBLEMENT, plutôt que de proposer un départ sur un tracé qui
+ * ne correspond à aucun chemin réel.
+ */
+describe("fiche d'une randonnée : refus plutôt que faux itinéraire", () => {
+  function renderSheet(props: Partial<Parameters<typeof TrailPreviewSheet>[0]> = {}) {
+    render(
+      <MemoryRouter>
+        <TrailPreviewSheet trail={trail({ approachM: 20 })} onClose={vi.fn()} onStart={vi.fn()} onGuideToStart={vi.fn()} {...props} />
+      </MemoryRouter>,
+    );
+  }
+
+  it("propose de démarrer quand le tracé est exploitable", () => {
+    renderSheet();
+    expect(screen.getByTestId("trail-start")).toBeEnabled();
+    expect(screen.queryByTestId("trail-trace-notice")).toBeNull();
+  });
+
+  it("dit pourquoi et bloque le départ quand le tracé n'est pas un chemin réel", () => {
+    renderSheet({ traceNotice: "Ce tracé vient du jeu de démonstration." });
+    expect(screen.getByTestId("trail-trace-notice")).toHaveTextContent("Bientôt disponible");
+    expect(screen.getByTestId("trail-trace-notice")).toHaveTextContent("jeu de démonstration");
+    expect(screen.getByTestId("trail-start")).toBeDisabled();
+  });
+
+  it("affiche le refus d'itinéraire avec sa phrase exacte et propose les chemins alentour", () => {
+    const onShow = vi.fn();
+    renderSheet({
+      trail: trail({ approachM: 12_000 }),
+      notice: {
+        message: "Aucun itinéraire pédestre fiable disponible entre ces deux points.",
+        note: "Aucun chemin connu ne relie ces deux points.",
+        direction: "Direction indicative : le nord, à 12 km à vol d'oiseau — ce n'est pas un chemin.",
+      },
+      onShowNearbyPaths: onShow,
+    });
+    const notice = screen.getByTestId("trail-route-notice");
+    expect(notice).toHaveTextContent("Aucun itinéraire pédestre fiable disponible entre ces deux points.");
+    // La ligne droite affichée est nommée pour ce qu'elle est.
+    expect(notice).toHaveTextContent("ce n'est pas un chemin");
+    fireEvent.click(screen.getByTestId("trail-show-paths"));
+    expect(onShow).toHaveBeenCalled();
   });
 });

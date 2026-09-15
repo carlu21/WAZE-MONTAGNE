@@ -8,11 +8,11 @@
  * statistiques collectives.
  */
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { ChevronLeft, Download, MapPinned, Share2, Trash2, Upload } from "lucide-react";
+import { Download, MapPinned, Share2, Trash2, Upload } from "lucide-react";
 import { formatDistance, formatDurationShort, fr, type ActivityMode } from "@mountain-live/core";
 import { Badge, Button, Card, EmptyState, IconButton, ListItem, Modal, RelativeTime, Toggle, TopBar, toast } from "@/components/ui";
 import { db, type SavedTrack } from "@/lib/db";
+import { groupActivitiesByDay } from "@/features/navigation/activityGroups";
 import { useIsAuthenticated } from "@/store/session";
 import { useMe, useUpdatePreferences } from "@/features/account/useMe";
 import { deleteActivity, deleteAllActivities, setContribution, syncPendingActivities } from "@/features/navigation/activities";
@@ -20,7 +20,6 @@ import { shareOrDownloadGpx } from "@/features/navigation/tracks";
 import { CURRENT_TRACK_ID } from "@/features/navigation/tracks";
 
 export default function ActivitiesPage() {
-  const navigate = useNavigate();
   const authenticated = useIsAuthenticated();
   const { user } = useMe();
   const updatePreferences = useUpdatePreferences();
@@ -70,11 +69,6 @@ export default function ActivitiesPage() {
       <TopBar
         variant="solid"
         title={fr.network.activities.title}
-        leading={
-          <IconButton aria-label={fr.common.back} variant="ghost" onClick={() => navigate("/profile")}>
-            <ChevronLeft />
-          </IconButton>
-        }
       />
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pb-10 pt-3">
@@ -108,13 +102,18 @@ export default function ActivitiesPage() {
           {tracks === null ? null : tracks.length === 0 ? (
             <EmptyState icon={<MapPinned />} title={fr.network.activities.empty} description={fr.network.activities.emptyHint} />
           ) : (
+            groupActivitiesByDay(tracks).map((day) => (
+              <section key={day.key} className="flex flex-col gap-2" aria-label={day.label}>
+                <h2 className="text-[13px] font-bold uppercase tracking-wide text-muted">
+                  {day.label} · {day.count} activité{day.count > 1 ? "s" : ""} · {formatDistance(day.distanceM)}
+                </h2>
             <ul className="flex flex-col gap-2">
-              {tracks.map((t) => (
+              {day.tracks.map((t) => (
                 <li key={t.id}>
                   <Card padding="md" as="article">
                     <header className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h2 className="truncate text-[16px] font-bold text-fg">{t.name}</h2>
+                        <h3 className="truncate text-[16px] font-bold text-fg">{t.name}</h3>
                         <p className="text-[13px] text-muted">
                           <RelativeTime date={new Date(t.savedAt).toISOString()} /> · {fr.navigation.activities[t.activity as ActivityMode]}
                         </p>
@@ -150,6 +149,8 @@ export default function ActivitiesPage() {
                 </li>
               ))}
             </ul>
+              </section>
+            ))
           )}
 
           {(tracks?.length ?? 0) > 0 ? (

@@ -19,8 +19,22 @@ import { portalRoot } from "@/lib/portal";
 import { useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { Map as MaplibreMap } from "maplibre-gl";
-import { backtrackRoute, compassLabel, formatDistance, fr, interpolate, returnGuidance, routeFromTrail, type LatLng, type NavRoute } from "@mountain-live/core";
-import { Button, Modal, PageLoader, toast } from "@/components/ui";
+import {
+  backtrackRoute,
+  canJudgeTrail,
+  compassLabel,
+  formatDistance,
+  fr,
+  geometryFidelity,
+  interpolate,
+  positionTrust,
+  returnGuidance,
+  routeFromTrail,
+  type Basemap,
+  type LatLng,
+  type NavRoute,
+} from "@mountain-live/core";
+import { Button, Modal, PageLoader, Segmented, toast } from "@/components/ui";
 import { MapView, isMapAlive } from "@/components/map/MapView";
 import { api } from "@/lib/api";
 import { qk } from "@/lib/queryKeys";
@@ -47,8 +61,11 @@ export default function NavigationPage() {
   const offRoutePrompt = useNavigationStore((s) => s.offRoutePrompt);
   const finalTrack = useNavigationStore((s) => s.finalTrack);
   const finalRaw = useNavigationStore((s) => s.finalRaw);
+  const basemap = useUiStore((s) => s.basemap);
+  const setBasemap = useUiStore((s) => s.setBasemap);
   const mapRef = useRef<MaplibreMap | null>(null);
   const [stopConfirm, setStopConfirm] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
   const [returnTarget, setReturnTarget] = useState<LatLng | null>(null);
   const autoStarted = useRef(false);
 
@@ -140,16 +157,43 @@ export default function NavigationPage() {
     }
   }, []);
 
-  // Sortie d'itinéraire : consigne de retour (point le plus proche, distance, direction).
   const route = session?.route ?? null;
+
+  /*
+   * L'itinéraire suit-il un chemin réel ? Une polyligne qui avance de plusieurs
+   * centaines de mètres en ligne droite n'est pas un sentier : on ne la dessine
+   * pas et on ne donne aucune consigne de suivi dessus. Les traces GPX et les
+   * traces enregistrées sont des relevés réels : elles en sont dispensées.
+   */
+  const routeDrawable = useMemo(() => {
+    if (!route) return false;
+    if (route.source === "gpx" || route.source === "track") return true;
+    return geometryFidelity(route.coordinates, route.lengthM).level === "detailed";
+  }, [route]);
+
+  /*
+   * A-t-on le droit de parler d'écart au parcours ? Mêmes conditions que
+   * partout : GPS fiable, réseau chargé, matching effectué.
+   */
+  const judgeable = useMemo(
+    () =>
+      canJudgeTrail({
+        trust: positionTrust({ accuracy: live.output?.accuracy ?? null, quality: live.quality, fixes: live.fixes, searching: live.searching }),
+        networkSegments: live.networkSegments,
+        matchAttempted: live.output !== null,
+      }),
+    [live.output, live.quality, live.fixes, live.searching, live.networkSegments],
+  );
+
+  // Sortie d'itinéraire : consigne de retour (point le plus proche, distance, direction).
   const returnText = useMemo(() => {
-    if (!route || !live.offRoute || !live.output || !returnTarget) return null;
+    if (!route || !routeDrawable || !judgeable || !live.offRoute || !live.output || !returnTarget) return null;
     const g = returnGuidance(route, live.output.position, live.progress?.along ?? null);
     if (!g) return null;
     return interpolate(fr.navigation.guidanceToRoute, { distance: formatDistance(g.distanceM), direction: compassLabel(g.bearing) });
-  }, [route, live.offRoute, live.output, live.progress?.along, returnTarget]);
+  }, [route, routeDrawable, judgeable, live.offRoute, live.output, live.progress?.along, returnTarget]);
   useEffect(() => {
-    if (!live.offRoute) setReturnTarget(null);
+    if (!live.offRoute || !judgeable || !routeDrawable) setReturnTarget(null);
     else if (returnTarget && route && live.output) {
       const g = returnGuidance(route, live.output.position, live.progress?.along ?? null);
       if (g) setReturnTarget(g.target);
@@ -207,12 +251,34 @@ export default function NavigationPage() {
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-drawer)] overflow-hidden bg-bg" data-testid="nav-page">
-      <MapView className="absolute inset-0" onReady={onReady} aria-label="Carte de navigation" minZoom={6} maxZoom={19}>
-        <NavLayers route={route} returnTarget={returnTarget} />
+      <MapView className="absolute inset-0" onReady={onReady} basemap={basemap} aria-label="Carte de navigation" minZoom={6} maxZoom={19}>
+        <NavLayers route={route} routeDrawable={routeDrawable} returnTarget={returnTarget} />
       </MapView>
+
+      {/* Couches : accessible pendant l'activité, sans quitter la carte. */}
+      {layersOpen ? (
+        <div className="absolute left-3 z-[var(--z-overlay)] ml-glass rounded-2xl p-1 shadow-md" style={{ bottom: "calc(var(--safe-bottom) + 200px)" }} data-testid="nav-basemaps">
+          <Segmented
+            value={basemap}
+            onChange={(v) => {
+              setBasemap(v as Basemap);
+              setLayersOpen(false);
+            }}
+            options={[
+              { value: "topo", label: "Topo" },
+              { value: "satellite", label: "Satellite" },
+              { value: "relief", label: "Relief" },
+            ]}
+            aria-label={fr.mapUi.layers}
+          />
+        </div>
+      ) : null}
+
       <NavHud
         route={route}
+        routeDrawable={routeDrawable}
         returnGuidanceText={returnText}
+        onLayers={() => setLayersOpen((v) => !v)}
         onRecenter={() => {
           setFollow(true);
           const map = mapRef.current;
@@ -224,7 +290,7 @@ export default function NavigationPage() {
         onStop={() => setStopConfirm(true)}
       />
 
-      <Modal open={offRoutePrompt} onClose={() => useNavigationStore.getState().setOffRoutePrompt(false)} title={fr.navigation.offRoute} description={live.offRouteDistanceM !== null ? interpolate(fr.navigation.offRouteBody, { distance: formatDistance(live.offRouteDistanceM) }) : undefined} tone="danger" aria-label={fr.navigation.offRoute}>
+      <Modal open={offRoutePrompt && routeDrawable && judgeable} onClose={() => useNavigationStore.getState().setOffRoutePrompt(false)} title={fr.navigation.offRoute} description={live.offRouteDistanceM !== null ? interpolate(fr.navigation.offRouteBody, { distance: formatDistance(live.offRouteDistanceM) }) : undefined} tone="danger" aria-label={fr.navigation.offRoute}>
         <div className="flex flex-col gap-2" data-testid="nav-offroute">
           <Button size="lg" onClick={onReturnToRoute} fullWidth>
             {fr.navigation.returnToRoute}

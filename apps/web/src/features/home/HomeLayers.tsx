@@ -10,11 +10,19 @@
  * 2. **Les départs de randonnée proposés dans le panneau**, épinglés sur la
  *    carte : ce qui est listé en bas doit être visible en haut, sinon le lien
  *    entre les deux se perd. Le départ sélectionné grossit.
- * 3. **Le tracé de la randonnée sélectionnée**, sous les épingles.
+ * 3. **Le tracé de la randonnée sélectionnée**, sous les épingles — et
+ *    UNIQUEMENT s'il suit un chemin réellement relevé (`routeVerdict`). Un
+ *    tracé schématique ou de démonstration n'est pas dessiné du tout : mieux
+ *    vaut une carte sans ligne qu'une ligne qui ment sur le terrain.
+ * 4. Au besoin, **les chemins réels alentour** (« Afficher les chemins à
+ *    proximité ») et une **flèche de direction indicative** — courte, bornée,
+ *    étiquetée — quand aucun itinéraire ne peut être calculé. Cette flèche est
+ *    le seul usage légitime d'une ligne droite : elle ne se suit pas.
  */
 import { useEffect, useMemo, useRef } from "react";
 import type { MapMouseEvent } from "maplibre-gl";
-import type { LngLat, NearbyTrail } from "@mountain-live/core";
+import type { LngLat, NearbyTrail, PathSegment } from "@mountain-live/core";
+import { isSurveyed } from "@mountain-live/core";
 import { isMapAlive, useMap, useMapLayers } from "@/components/map/MapView";
 import { LAYER_IDS, SOURCE_IDS, addLayerOrdered, geoJsonSource, pointerCursorOn, removeLayerSafe, removeSourceSafe } from "@/components/map/layers";
 import { ensureImage } from "@/components/map/markers";
@@ -26,6 +34,10 @@ import { useUiStore } from "@/store/ui";
 const TRAIL_COLOR = "#2F6B3A";
 /** Bleu eau : la position de l'utilisateur, jamais confondue avec un itinéraire. */
 const USER_COLOR = "#1D6FA5";
+/** Terre battue : les chemins du réseau, discrets, jamais mis en avant. */
+const PATH_COLOR = "#8B5E3C";
+/** Gris ardoise : la flèche de direction. Ni vert « itinéraire », ni bleu « position ». */
+const DIRECTION_COLOR = "#5B6670";
 
 const HEAD_IMAGE = "ml-home-head";
 const HEAD_IMAGE_ACTIVE = "ml-home-head-active";
@@ -65,14 +77,23 @@ function dotSvg(): string {
 export interface HomeLayersProps {
   trails: readonly NearbyTrail[];
   selectedId: string | null;
-  /** Tracé complet de la randonnée sélectionnée, chargé à la demande. */
+  /**
+   * Tracé complet de la randonnée sélectionnée, chargé à la demande. Il n'est
+   * dessiné que si `geometryDrawable` : sinon la carte reste muette et la fiche
+   * explique pourquoi.
+   */
   selectedGeometry: LngLat[] | null;
+  geometryDrawable: boolean;
+  /** Chemins réels du secteur, affichés à la demande (« Afficher les chemins à proximité »). */
+  nearbyPaths: readonly PathSegment[] | null;
+  /** Flèche de cap indicatif (deux points, bornée) ou null. JAMAIS un itinéraire. */
+  direction: LngLat[] | null;
   /** Cap de déplacement (degrés) ou null à l'arrêt. */
   heading: number | null;
   onSelectTrail: (id: string) => void;
 }
 
-export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSelectTrail }: HomeLayersProps) {
+export function HomeLayers({ trails, selectedId, selectedGeometry, geometryDrawable, nearbyPaths, direction, heading, onSelectTrail }: HomeLayersProps) {
   const { map, ready, styleVersion } = useMap();
   const position = useUiStore((s) => s.position);
 
@@ -95,13 +116,37 @@ export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSe
     };
   }, [trails, selectedId]);
 
+  const paths = useMemo<FeatureCollection>(() => {
+    if (!nearbyPaths || nearbyPaths.length === 0) return EMPTY_COLLECTION;
+    return {
+      type: "FeatureCollection",
+      features: nearbyPaths
+        .filter((p) => p.coordinates.length >= 2)
+        .map((p) => ({
+          type: "Feature",
+          id: p.id,
+          geometry: { type: "LineString", coordinates: p.coordinates.map((c) => [c[0], c[1]]) },
+          // Un chemin de démonstration se voit : pointillé clair, et il le reste.
+          properties: { id: p.id, name: p.name ?? "", surveyed: isSurveyed(p.source) },
+        })),
+    };
+  }, [nearbyPaths]);
+
+  const directionLine = useMemo<FeatureCollection>(() => {
+    if (!direction || direction.length < 2) return EMPTY_COLLECTION;
+    return {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", geometry: { type: "LineString", coordinates: direction.map((c) => [c[0], c[1]]) }, properties: {} }],
+    };
+  }, [direction]);
+
   const trail = useMemo<FeatureCollection>(() => {
-    if (!selectedGeometry || selectedGeometry.length < 2) return EMPTY_COLLECTION;
+    if (!geometryDrawable || !selectedGeometry || selectedGeometry.length < 2) return EMPTY_COLLECTION;
     return {
       type: "FeatureCollection",
       features: [{ type: "Feature", geometry: { type: "LineString", coordinates: selectedGeometry.map((c) => [c[0], c[1]]) }, properties: {} }],
     };
-  }, [selectedGeometry]);
+  }, [selectedGeometry, geometryDrawable]);
 
   const user = useMemo<FeatureCollection>(() => {
     if (!position) return EMPTY_COLLECTION;
@@ -119,8 +164,8 @@ export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSe
     return { type: "FeatureCollection", features };
   }, [position, heading]);
 
-  const data = useRef({ heads, trail, user });
-  data.current = { heads, trail, user };
+  const data = useRef({ heads, trail, user, paths, directionLine });
+  data.current = { heads, trail, user, paths, directionLine };
 
   useMapLayers((m) => {
     void ensureImage(m, HEAD_IMAGE, headSvg(false));
@@ -128,9 +173,43 @@ export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSe
     void ensureImage(m, ARROW_IMAGE, arrowSvg());
     void ensureImage(m, DOT_IMAGE, dotSvg());
 
+    if (!m.getSource(SOURCE_IDS.homePaths)) m.addSource(SOURCE_IDS.homePaths, { type: "geojson", data: data.current.paths });
+    if (!m.getSource(SOURCE_IDS.homeDirection)) m.addSource(SOURCE_IDS.homeDirection, { type: "geojson", data: data.current.directionLine });
     if (!m.getSource(SOURCE_IDS.homeTrail)) m.addSource(SOURCE_IDS.homeTrail, { type: "geojson", data: data.current.trail });
     if (!m.getSource(SOURCE_IDS.homeHeads)) m.addSource(SOURCE_IDS.homeHeads, { type: "geojson", data: data.current.heads });
     if (!m.getSource(SOURCE_IDS.homeUser)) m.addSource(SOURCE_IDS.homeUser, { type: "geojson", data: data.current.user });
+
+    // Chemins du secteur : fins, bruns, en retrait. Les chemins non relevés
+    // (démonstration) sont pointillés et pâles — ils ne prétendent à rien.
+    addLayerOrdered(m, {
+      id: LAYER_IDS.homePathsCasing,
+      type: "line",
+      source: SOURCE_IDS.homePaths,
+      paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 4.5], "line-opacity": 0.55 },
+      layout: { "line-cap": "round", "line-join": "round" },
+    });
+    addLayerOrdered(m, {
+      id: LAYER_IDS.homePaths,
+      type: "line",
+      source: SOURCE_IDS.homePaths,
+      paint: {
+        "line-color": PATH_COLOR,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.9, 16, 2.4],
+        "line-opacity": ["case", ["==", ["get", "surveyed"], true], 0.9, 0.45],
+        "line-dasharray": ["case", ["==", ["get", "surveyed"], true], ["literal", [1, 0]], ["literal", [1.5, 2]]],
+      },
+      layout: { "line-cap": "round", "line-join": "round" },
+    });
+
+    // Direction indicative : pointillés courts, gris, JAMAIS la couleur d'un
+    // itinéraire. Elle s'arrête à quelques dizaines de mètres, exprès.
+    addLayerOrdered(m, {
+      id: LAYER_IDS.homeDirection,
+      type: "line",
+      source: SOURCE_IDS.homeDirection,
+      paint: { "line-color": DIRECTION_COLOR, "line-width": 3, "line-dasharray": [1, 1.6], "line-opacity": 0.85 },
+      layout: { "line-cap": "round" },
+    });
 
     // Tracé : un liseré blanc dessous pour rester lisible sur fond topographique.
     addLayerOrdered(m, {
@@ -213,10 +292,13 @@ export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSe
         LAYER_IDS.homeHeads,
         LAYER_IDS.homeTrail,
         LAYER_IDS.homeTrailCasing,
+        LAYER_IDS.homeDirection,
+        LAYER_IDS.homePaths,
+        LAYER_IDS.homePathsCasing,
       ]) {
         removeLayerSafe(m, id);
       }
-      for (const id of [SOURCE_IDS.homeUser, SOURCE_IDS.homeHeads, SOURCE_IDS.homeTrail]) removeSourceSafe(m, id);
+      for (const id of [SOURCE_IDS.homeUser, SOURCE_IDS.homeHeads, SOURCE_IDS.homeTrail, SOURCE_IDS.homeDirection, SOURCE_IDS.homePaths]) removeSourceSafe(m, id);
     };
   }, [styleVersion]);
 
@@ -229,6 +311,16 @@ export function HomeLayers({ trails, selectedId, selectedGeometry, heading, onSe
     if (!isMapAlive(map) || !ready) return;
     geoJsonSource(map, SOURCE_IDS.homeTrail)?.setData(trail);
   }, [map, ready, styleVersion, trail]);
+
+  useEffect(() => {
+    if (!isMapAlive(map) || !ready) return;
+    geoJsonSource(map, SOURCE_IDS.homePaths)?.setData(paths);
+  }, [map, ready, styleVersion, paths]);
+
+  useEffect(() => {
+    if (!isMapAlive(map) || !ready) return;
+    geoJsonSource(map, SOURCE_IDS.homeDirection)?.setData(directionLine);
+  }, [map, ready, styleVersion, directionLine]);
 
   useEffect(() => {
     if (!isMapAlive(map) || !ready) return;

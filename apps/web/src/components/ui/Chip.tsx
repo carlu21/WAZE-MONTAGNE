@@ -66,7 +66,13 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
           {iconNode}
         </span>
       ) : null}
-      <span className="truncate">{children}</span>
+      {/*
+        `leading-[1.35]` : la puce est en `leading-none`, et `truncate` masque ce
+        qui dépasse — l'accent d'un « À » ou d'un « É » capital sortait du cadre
+        et disparaissait. On rend la ligne au texte ; la hauteur de la puce est
+        fixe, elle ne bouge pas.
+      */}
+      <span className="truncate leading-[1.35]">{children}</span>
       {typeof count === "number" ? (
         <span className="tabular rounded-full bg-fg/8 px-1.5 py-0.5 text-[12px] font-bold" aria-label={`${count}`}>
           {count}

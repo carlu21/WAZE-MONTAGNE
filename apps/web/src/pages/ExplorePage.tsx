@@ -1,19 +1,41 @@
 /**
- * Page Explorer (section 22) : recherche d'un secteur (commune, massif, sentier,
- * sommet, lieu) avant de s'y rendre ; secteurs populaires et consultés récemment.
+ * EXPLORER — la page de DÉCOUVERTE (« où va-t-on ? »).
+ *
+ * Ce n'est pas une seconde carte principale : l'Accueil EST la carte, et le
+ * doublon serait une hésitation de navigation. Ici on cherche, on filtre, on
+ * choisit — et la carte n'intervient qu'ensuite, quand on a choisi.
+ *
+ *   recherche  → un lieu-dit, une commune, un massif, un sommet, un sentier
+ *   filtres    → à proximité · durée · difficulté · activité
+ *   listes     → randonnées autour de vous, secteurs populaires, consultés récemment
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Compass, History, Mountain, Navigation, Navigation2, Users } from "lucide-react";
+import { Compass, Footprints, History, Mountain, Navigation, Navigation2, Users } from "lucide-react";
 import { fr, type Area } from "@mountain-live/core";
-import { CategoryIcon, EmptyState, ListItem, SearchField, SkeletonListItem, TopBar } from "@/components/ui";
+import { Chip, CategoryIcon, EmptyState, ListItem, SearchField, SkeletonListItem, TopBar } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useUiStore } from "@/store/ui";
 import { qk } from "@/lib/queryKeys";
 import { formatElevation } from "@/lib/format";
 import { AREA_TYPE_ICONS, areaSubtitle } from "@/features/map/areas";
 import { POPULAR_SECTORS, groupAreasByType, loadRecentAreas, pushRecentArea } from "@/features/explore/search";
+import { useGeolocation } from "@/features/map/useGeolocation";
+import {
+  ACTIVITY_OPTIONS,
+  DEFAULT_EXPLORE_FILTERS,
+  DIFFICULTY_OPTIONS,
+  DURATION_OPTIONS,
+  activeFilterCount,
+  filterTrails,
+  type ExploreFilters,
+} from "@/features/explore/filters";
+import { useNearby } from "@/features/home/useNearby";
+import { approachLabel, durationLabel, lengthLabel } from "@/features/home/format";
+
+/** « À proximité » : le départ est à moins de ça, à pied ou à quelques minutes de voiture. */
+const NEARBY_LIMIT_M = 15_000;
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -29,6 +51,15 @@ export default function ExplorePage() {
   const [q, setQ] = useState("");
   const debounced = useDebounced(q.trim(), 250);
   const [recent, setRecent] = useState<Area[]>(() => loadRecentAreas());
+  const [filters, setFilters] = useState<ExploreFilters>(DEFAULT_EXPLORE_FILTERS);
+  // « À proximité » n'a de sens qu'avec une position : on la suit ici aussi, sans
+  // rien redemander si l'autorisation a déjà été accordée.
+  useGeolocation();
+
+  // Les randonnées alentour, filtrées ici et pas ailleurs : Explorer sert à trier.
+  const nearby = useNearby({ activity: "all", sort: "closest", limit: 30 });
+  const discovered = useMemo(() => filterTrails(nearby.data?.trails ?? [], filters), [nearby.data, filters]);
+  const filterCount = activeFilterCount(filters);
 
   const search = useQuery({
     queryKey: qk.areaSearch(debounced),
@@ -87,6 +118,74 @@ export default function ExplorePage() {
             )
           ) : (
             <>
+              {/* Filtres : quatre questions qu'on se pose avant de partir. */}
+              <section aria-label="Filtres de découverte" className="flex flex-col gap-2" data-testid="explore-filters">
+                <div className="flex flex-wrap gap-2">
+                  <Chip
+                    selected={filters.nearbyM !== null}
+                    onClick={() => setFilters((f) => ({ ...f, nearbyM: f.nearbyM === null ? NEARBY_LIMIT_M : null }))}
+                    icon={<Navigation />}
+                  >
+                    À proximité
+                  </Chip>
+                  {DURATION_OPTIONS.filter((o) => o.id !== "all").map((o) => (
+                    <Chip key={o.id} selected={filters.duration === o.id} onClick={() => setFilters((f) => ({ ...f, duration: f.duration === o.id ? "all" : o.id }))}>
+                      {o.label}
+                    </Chip>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {DIFFICULTY_OPTIONS.filter((o) => o.id !== "all").map((o) => (
+                    <Chip key={o.id} selected={filters.difficulty === o.id} onClick={() => setFilters((f) => ({ ...f, difficulty: f.difficulty === o.id ? "all" : o.id }))}>
+                      {o.label}
+                    </Chip>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ACTIVITY_OPTIONS.filter((o) => o.id !== "all").map((o) => (
+                    <Chip key={o.id} selected={filters.activity === o.id} onClick={() => setFilters((f) => ({ ...f, activity: f.activity === o.id ? "all" : o.id }))}>
+                      {o.label}
+                    </Chip>
+                  ))}
+                </div>
+              </section>
+
+              {/* Randonnées autour de vous — la découverte, pas la carte. */}
+              <section aria-label="Randonnées autour de vous">
+                <h2 className="mb-1 flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide text-muted">
+                  <Footprints className="size-4" aria-hidden="true" /> Randonnées autour de vous
+                </h2>
+                {!nearby.hasPosition ? (
+                  <EmptyState compact icon={<Navigation />} title="Position inconnue" description="Autorisez la localisation depuis l'Accueil pour voir les randonnées autour de vous." />
+                ) : nearby.isLoading && discovered.length === 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <SkeletonListItem />
+                    <SkeletonListItem />
+                  </div>
+                ) : discovered.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={<Footprints />}
+                    title="Aucune randonnée ne correspond"
+                    description={filterCount > 0 ? `${filterCount} filtre${filterCount > 1 ? "s" : ""} actif${filterCount > 1 ? "s" : ""} : élargissez la recherche.` : "Aucune randonnée connue autour de vous pour l'instant."}
+                  />
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-line bg-surface" data-testid="explore-trails">
+                    {discovered.slice(0, 12).map((t, i) => (
+                      <ListItem
+                        key={t.id}
+                        icon={<Footprints />}
+                        title={t.name}
+                        subtitle={`${approachLabel(t.approachM)} · ${lengthLabel(t.lengthM)} · ${durationLabel(t.durationMs, t.durationObserved)}`}
+                        onClick={() => navigate("/home", { state: { selectTrail: t.id } })}
+                        chevron
+                        divider={i < Math.min(discovered.length, 12) - 1}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
               <div className="overflow-hidden rounded-xl border border-line bg-surface">
                 <ListItem icon={<Navigation2 />} title={fr.navigation.title} subtitle="Suivi GPS sur les sentiers, guidage pas à pas, alertes devant vous" to="/navigate" chevron />
                 <ListItem icon={<Navigation />} title={fr.nav.around} subtitle="Ce qui se passe à proximité, trié par distance" to="/around" chevron />

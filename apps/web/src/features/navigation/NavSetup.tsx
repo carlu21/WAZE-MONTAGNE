@@ -16,6 +16,7 @@ import {
   formatDistance,
   formatDurationShort,
   fr,
+  geometryFidelity,
   haversineM,
   routeFromGpx,
   routeFromTrail,
@@ -146,8 +147,21 @@ export function NavSetup({ presetRoute, presetMode, presetSimulate, onStart }: N
         for (const z of await db.zones.toArray()) full = z.trails.find((x) => x.id === t.id) ?? full;
       }
       const r = full ? routeFromTrail(full) : null;
-      if (r) setRoute(r);
-      else toast.warning("Tracé indisponible pour cet itinéraire.");
+      if (!r) {
+        toast.warning("Tracé indisponible pour cet itinéraire.");
+        return;
+      }
+      /*
+       * Un tracé qui relie des points de passage espacés de centaines de mètres
+       * n'est pas un sentier : le suivre reviendrait à traverser la montagne en
+       * ligne droite. On refuse, et on dit pourquoi — mieux vaut « bientôt
+       * disponible » qu'un itinéraire techniquement faux.
+       */
+      if (geometryFidelity(r.coordinates, t.distanceKm * 1000).level !== "detailed") {
+        toast.warning(fr.navigation.unavailable.schematicGeometry);
+        return;
+      }
+      setRoute(r);
     } catch {
       toast.warning("Tracé indisponible pour l'instant.");
     } finally {

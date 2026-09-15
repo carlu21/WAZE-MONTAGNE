@@ -17,7 +17,11 @@ import {
   createNavState,
   deadReckon,
   fr,
+  TRAIL_TOLERANCE_M,
+  canJudgeTrail,
+  isSurveyed,
   navigationStep,
+  positionTrust,
   trackStats,
   type GpsFix,
   type Maneuver,
@@ -140,7 +144,19 @@ export function useNavigationEngine(): void {
       engineTrack.current = step.state.track;
       engineRaw.current = step.state.raw;
       const points = step.state.track.length;
+      /*
+       * Deux compteurs qui gardent l'affichage honnête (cahier des charges,
+       * « Hors sentier ») :
+       *  - `fixes` : tant qu'on n'a pas plusieurs relevés, la position n'est
+       *    pas acquise et aucun jugement n'est permis ;
+       *  - `consecutiveOffTrail` : nombre de relevés successifs loin de tout
+       *    chemin. Un seul relevé aberrant ne fait pas sortir du sentier.
+       */
+      const farFromPath = !step.output.matched && step.output.distanceToPathM > TRAIL_TOLERANCE_M;
+      const consecutiveOffTrail = farFromPath ? st.live.consecutiveOffTrail + 1 : 0;
       st.setLive({
+        fixes: st.live.fixes + 1,
+        consecutiveOffTrail,
         output: step.output,
         progress: step.progress,
         instruction: step.instruction,
@@ -166,7 +182,18 @@ export function useNavigationEngine(): void {
         if (st.voice && (a.sound || a.level >= 2)) speak(a.message, { priority: a.tone === "danger" ? "high" : "normal" });
       }
       if (step.announceInstruction && step.instruction && st.voice) speak(step.instruction.text, { priority: step.instruction.distanceM <= 25 ? "high" : "normal" });
-      if (step.offRouteChange === "left") {
+      /*
+       * Sortie d'itinéraire : on ne l'ANNONCE que si la position permet d'en
+       * juger — GPS précis, réseau chargé, matching effectué. Avec un GPS
+       * encore incertain, le moteur peut basculer : l'utilisateur, lui, n'a
+       * pas à lire « vous avez quitté l'itinéraire » sur un doute.
+       */
+      const judgeable = canJudgeTrail({
+        trust: positionTrust({ accuracy: step.output.accuracy, quality: step.output.quality, fixes: st.live.fixes + 1, searching: st.live.searching }),
+        networkSegments: ld.graph.segments.size,
+        matchAttempted: true,
+      });
+      if (step.offRouteChange === "left" && judgeable) {
         for (const k of shownToasts.current) toast.dismiss(k);
         shownToasts.current.clear();
         st.setOffRoutePrompt(true);
@@ -283,11 +310,14 @@ const engineTrack = { current: [] as TrackPoint[] };
 const engineRaw = { current: [] as RawPoint[] };
 
 /** GeoJSON des segments chargés (couche « réseau » de la carte de navigation). */
-export function networkGraphSnapshot(): { type: "FeatureCollection"; features: { type: "Feature"; geometry: { type: "LineString"; coordinates: [number, number][] }; properties: { id: string; kind: string; name: string | null } }[] } {
+export function networkGraphSnapshot(): { type: "FeatureCollection"; features: { type: "Feature"; geometry: { type: "LineString"; coordinates: [number, number][] }; properties: { id: string; kind: string; name: string | null; surveyed: boolean } }[] } {
   const graph = getLoader().graph;
   const features = [] as ReturnType<typeof networkGraphSnapshot>["features"];
   for (const seg of graph.segments.values()) {
-    features.push({ type: "Feature", geometry: { type: "LineString", coordinates: seg.coordinates.map((c) => [c[0], c[1]]) }, properties: { id: seg.id, kind: seg.kind, name: seg.name } });
+    // `surveyed` porte la provenance jusqu'à la carte : un chemin de
+    // démonstration se dessine pâle et pointillé, il ne se fait pas passer
+    // pour un sentier relevé.
+    features.push({ type: "Feature", geometry: { type: "LineString", coordinates: seg.coordinates.map((c) => [c[0], c[1]]) }, properties: { id: seg.id, kind: seg.kind, name: seg.name, surveyed: isSurveyed(seg.source) } });
   }
   return { type: "FeatureCollection", features };
 }

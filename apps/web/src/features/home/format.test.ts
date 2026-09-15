@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PREVIEW_PEEK_BASE, PREVIEW_PEEK_MAX, previewPeekHeight } from "./TrailPreviewSheet";
 import {
   AT_TRAILHEAD_M,
   DIFFICULTY_LABELS,
@@ -103,5 +104,14 @@ describe("cadrage et départ", () => {
     expect(atTrailhead(AT_TRAILHEAD_M + 1)).toBe(false);
     expect(atTrailhead(4200)).toBe(false);
     expect(atTrailhead(Number.NaN)).toBe(false);
+  });
+});
+
+describe("palier d'aperçu de la fiche", () => {
+  it("s'agrandit pour montrer un refus, sans jamais avaler la carte", () => {
+    expect(previewPeekHeight(null, null)).toBe(PREVIEW_PEEK_BASE);
+    expect(previewPeekHeight("tracé schématique", null)).toBeGreaterThan(PREVIEW_PEEK_BASE);
+    // Les deux encarts réunis dépasseraient l'écran : le palier est plafonné.
+    expect(previewPeekHeight("tracé schématique", { message: "Aucun itinéraire", note: null, direction: null })).toBe(PREVIEW_PEEK_MAX);
   });
 });

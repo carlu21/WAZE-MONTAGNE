@@ -50,6 +50,7 @@ import {
   estimateTime,
   frequentationLevel,
   isPublishable,
+  isSurveyed,
   nearbyNote,
   nearestTrailhead,
   rankNearby,
@@ -67,6 +68,7 @@ import {
   type NearbyResult,
   type NearbySort,
   type NearbyTrail,
+  type PathSource,
   type ReportHintInput,
   type SegmentProfile,
   type SegmentStatistics,
@@ -710,5 +712,16 @@ export function trailGeometry(id: string): TrailGeometryResponse | null {
   if (row === undefined) return null;
   const line = trailLine(row);
   const attached = db.select().from(paths).where(eq(paths.trailId, row.id)).all();
-  return { id: row.id, name: row.name, coordinates: line, elevations: trailElevations(line, attached) };
+  /*
+   * Provenance du tracé : celle des segments qui le composent quand ils sont
+   * unanimes, sinon celle de la moins fiable d'entre elles. Elle est envoyée
+   * telle quelle — c'est le client qui décide, à partir d'elle, s'il a le droit
+   * de dessiner l'itinéraire (`routeVerdict`). Ne jamais « promouvoir » une
+   * géométrie de démonstration en géométrie relevée pour faire joli.
+   */
+  const sources = new Set(attached.map((p) => p.source as PathSource));
+  const source: PathSource | null =
+    sources.size === 0 ? null : [...sources].find((s) => !isSurveyed(s)) ?? [...sources][0];
+  const declaredLengthM = Number.isFinite(row.distanceKm) && row.distanceKm > 0 ? Math.round(row.distanceKm * 1000) : null;
+  return { id: row.id, name: row.name, coordinates: line, elevations: trailElevations(line, attached), source, declaredLengthM };
 }

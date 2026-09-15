@@ -8,7 +8,7 @@ import { AppShell, NAV_ENTRIES, isNavActive } from "./AppShell";
 vi.mock("@/features/offline/OfflineBanner", () => ({ OfflineBanner: () => <div data-testid="offline-banner" /> }));
 vi.mock("@/features/alerts/AlertsWatcher", () => ({ AlertsWatcher: () => null }));
 
-function renderShell(path = "/map") {
+function renderShell(path = "/home") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -22,32 +22,35 @@ function renderShell(path = "/map") {
 }
 
 describe("<AppShell />", () => {
-  it("rend les cinq entrées de navigation avec le bouton central « Signaler »", () => {
+  it("rend QUATRE entrées : Accueil, Explorer, Activités, Profil", () => {
     renderShell();
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.textContent?.trim())).toEqual(["Accueil", "Carte", "Signaler", "Explorer", "Profil"]);
-    expect(within(nav).getByRole("link", { name: "Signaler" })).toHaveAttribute("href", "/report");
-    expect(within(nav).getByRole("link", { name: "Carte" })).toHaveAttribute("href", "/map");
-    expect(within(nav).getByRole("link", { name: "Explorer" })).toHaveAttribute("href", "/explore");
+    expect(links.map((l) => l.textContent?.trim())).toEqual(["Accueil", "Explorer", "Activités", "Profil"]);
     expect(within(nav).getByRole("link", { name: "Accueil" })).toHaveAttribute("href", "/home");
+    expect(within(nav).getByRole("link", { name: "Explorer" })).toHaveAttribute("href", "/explore");
+    expect(within(nav).getByRole("link", { name: "Activités" })).toHaveAttribute("href", "/activities");
     expect(within(nav).getByRole("link", { name: "Profil" })).toHaveAttribute("href", "/profile");
   });
 
-  it("renonce à son bouton « Signaler » sur un écran qui porte déjà le sien", () => {
-    renderShell("/home");
+  it("n'a plus d'onglet « Carte » : l'Accueil EST la carte", () => {
+    renderShell();
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
-    const links = within(nav).getAllByRole("link");
-    // Quatre entrées, aucun doublon du bouton de signalement.
-    expect(links.map((l) => l.textContent?.trim())).toEqual(["Accueil", "Carte", "Explorer", "Profil"]);
+    expect(within(nav).queryByRole("link", { name: "Carte" })).toBeNull();
+  });
+
+  it("ne fait pas de « Signaler » une destination : l'action vit sur la carte", () => {
+    renderShell();
+    const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     expect(within(nav).queryByRole("link", { name: "Signaler" })).toBeNull();
+    expect(within(nav).getAllByRole("link")).toHaveLength(4);
   });
 
   it("marque l'entrée active avec aria-current", () => {
     renderShell("/explore");
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     expect(within(nav).getByRole("link", { name: "Explorer" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "Carte" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).getByRole("link", { name: "Accueil" })).not.toHaveAttribute("aria-current");
   });
 
   it("rend le contenu, la bannière hors connexion et le lien d'évitement", () => {
@@ -65,10 +68,11 @@ describe("<AppShell />", () => {
     expect(document.documentElement.style.getPropertyValue("--shell-bottom")).toBe("");
   });
 
-  it("considère « Autour de moi » et les fiches comme des sous-écrans de la carte", () => {
-    const map = NAV_ENTRIES[1];
-    expect(isNavActive(map, "/around")).toBe(true);
-    expect(isNavActive(map, "/reports/abc")).toBe(true);
-    expect(isNavActive(map, "/mapping")).toBe(false);
+  it("considère la navigation, « Autour de moi » et les fiches comme des sous-écrans de l'Accueil", () => {
+    const home = NAV_ENTRIES[0];
+    expect(isNavActive(home, "/navigate")).toBe(true);
+    expect(isNavActive(home, "/around")).toBe(true);
+    expect(isNavActive(home, "/reports/abc")).toBe(true);
+    expect(isNavActive(home, "/homestead")).toBe(false);
   });
 });

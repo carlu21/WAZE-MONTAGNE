@@ -9,10 +9,15 @@
  * L'action principale dépend de la distance au départ (section 16) : on ne
  * propose pas de « démarrer » une randonnée dont le départ est à 7 km. On
  * propose d'abord d'y aller.
+ *
+ * Et quand la donnée ne permet pas de tenir la promesse — tracé schématique,
+ * données de démonstration, aucun chemin entre ici et le départ — la fiche le
+ * DIT au lieu de dessiner une ligne droite. On propose alors ce qui est vrai :
+ * voir les chemins réels du secteur, et un cap indicatif qui s'annonce comme tel.
  */
-import { Download, Footprints, Info, Navigation2, TriangleAlert } from "lucide-react";
+import { Compass, Download, Footprints, Info, Navigation2, Route, TriangleAlert } from "lucide-react";
 import { useNavigate } from "react-router";
-import type { NearbyTrail } from "@mountain-live/core";
+import { fr, type NearbyTrail } from "@mountain-live/core";
 import { Badge, BottomSheet, Button } from "@/components/ui";
 import {
   DIFFICULTY_LABELS,
@@ -26,14 +31,64 @@ import {
   lengthLabel,
 } from "./format";
 
+export interface TrailPreviewNotice {
+  message: string;
+  note: string | null;
+  /**
+   * Cap et distance à vol d'oiseau vers la destination, déjà mis en phrase.
+   * Il remplace l'étiquette générique : une flèche de 90 m est invisible à
+   * l'échelle d'un massif, la phrase, elle, reste lisible.
+   */
+  direction: string | null;
+}
+
 export interface TrailPreviewSheetProps {
   trail: NearbyTrail | null;
   onClose: () => void;
   onStart: (trail: NearbyTrail) => void;
   onGuideToStart: (trail: NearbyTrail) => void;
+  /** Un itinéraire est en cours de calcul sur le réseau réel. */
+  planning?: boolean;
+  /** Refus du calcul d'itinéraire : rien n'a été tracé, et voici pourquoi. */
+  notice?: TrailPreviewNotice | null;
+  /** Le tracé de la randonnée elle-même n'est pas exploitable : on ne le dessine pas. */
+  traceNotice?: string | null;
+  pathsShown?: boolean;
+  onShowNearbyPaths?: () => void;
 }
 
-export function TrailPreviewSheet({ trail, onClose, onStart, onGuideToStart }: TrailPreviewSheetProps) {
+/**
+ * Hauteur du palier d'aperçu (px). Elle s'ajuste aux encarts d'indisponibilité :
+ * une explication qui pousse l'action principale hors de l'écran remplace un
+ * problème par un autre.
+ */
+export const PREVIEW_PEEK_BASE = 372;
+export const PREVIEW_PEEK_TRACE_NOTICE = 108;
+export const PREVIEW_PEEK_ROUTE_NOTICE = 170;
+/**
+ * Plafond du palier d'aperçu (px) : la carte garde toujours le tiers haut de
+ * l'écran. C'est là que l'on vient de faire apparaître les chemins du secteur —
+ * une feuille qui les recouvre annulerait la seule réponse utile qu'on ait pu
+ * donner. Au-delà, la feuille défile.
+ */
+export const PREVIEW_PEEK_MAX = 552;
+
+export function previewPeekHeight(traceNotice: string | null, notice: TrailPreviewNotice | null): number {
+  const wanted = PREVIEW_PEEK_BASE + (traceNotice ? PREVIEW_PEEK_TRACE_NOTICE : 0) + (notice ? PREVIEW_PEEK_ROUTE_NOTICE : 0);
+  return Math.min(wanted, PREVIEW_PEEK_MAX);
+}
+
+export function TrailPreviewSheet({
+  trail,
+  onClose,
+  onStart,
+  onGuideToStart,
+  planning = false,
+  notice = null,
+  traceNotice = null,
+  pathsShown = false,
+  onShowNearbyPaths,
+}: TrailPreviewSheetProps) {
   const navigate = useNavigate();
   if (!trail) return null;
   const here = atTrailhead(trail.approachM);
@@ -47,7 +102,7 @@ export function TrailPreviewSheet({ trail, onClose, onStart, onGuideToStart }: T
       // Le palier d'aperçu montre l'essentiel ET l'action principale en entier :
       // une randonnée qu'il faut faire glisser pour savoir comment la lancer
       // n'est pas « immédiatement compréhensible ».
-      snapPoints={{ peek: 372, half: 0.62, full: 0.92 }}
+      snapPoints={{ peek: previewPeekHeight(traceNotice, notice), half: 0.62, full: 0.92 }}
       backdrop="none"
       title={trail.name}
       aria-label={`Randonnée ${trail.name}`}
@@ -59,6 +114,34 @@ export function TrailPreviewSheet({ trail, onClose, onStart, onGuideToStart }: T
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
             {trail.reportHint ?? `${trail.activeReports} signalement${trail.activeReports > 1 ? "s" : ""} en cours sur cet itinéraire`}
           </p>
+        )}
+
+        {/*
+          Le tracé n'est pas affichable : on le dit ici, une fois, clairement.
+          Aucune ligne n'a été dessinée sur la carte — c'est voulu.
+        */}
+        {traceNotice && (
+          <div className="rounded-xl border border-line bg-surface-2 px-3 py-2" data-testid="trail-trace-notice">
+            <p className="flex items-start gap-2 text-[14px] font-semibold text-fg">
+              <Route className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+              {fr.navigation.unavailable.soon}
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-muted">{traceNotice}</p>
+          </div>
+        )}
+
+        {/* Refus du calcul d'itinéraire : la phrase exacte, puis ce qui reste vrai. */}
+        {notice && (
+          <div className="rounded-xl border border-line bg-surface-2 px-3 py-2" data-testid="trail-route-notice">
+            <p className="text-[14px] font-semibold text-fg">{notice.message}</p>
+            {notice.note && <p className="mt-1 text-[13px] leading-snug text-muted">{notice.note}</p>}
+            <p className="mt-1 text-[13px] leading-snug text-muted">{notice.direction ?? fr.navigation.directionOnly}</p>
+            {onShowNearbyPaths && (
+              <Button size="md" variant="secondary" className="mt-2" leftIcon={<Compass />} onClick={onShowNearbyPaths} data-testid="trail-show-paths">
+                {pathsShown ? "Masquer les chemins à proximité" : fr.navigation.unavailable.showNearbyPaths}
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Les chiffres du parcours — la longueur, jamais l'approche. */}
@@ -88,25 +171,25 @@ export function TrailPreviewSheet({ trail, onClose, onStart, onGuideToStart }: T
 
         <div className="space-y-2">
           {here ? (
-            <Button size="lg" fullWidth onClick={() => onStart(trail)} data-testid="trail-start">
-              <Footprints className="size-5" aria-hidden /> Démarrer la randonnée
+            <Button size="lg" fullWidth leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice)} data-testid="trail-start">
+              Démarrer la randonnée
             </Button>
           ) : (
-            <Button size="lg" fullWidth onClick={() => onGuideToStart(trail)} data-testid="trail-guide">
-              <Navigation2 className="size-5" aria-hidden /> Me guider vers le départ
+            <Button size="lg" fullWidth loading={planning} leftIcon={<Navigation2 />} onClick={() => onGuideToStart(trail)} data-testid="trail-guide">
+              {planning ? fr.navigation.unavailable.searching : "Me guider vers le départ"}
             </Button>
           )}
           <div className="grid grid-cols-2 gap-2">
             {!here && (
-              <Button size="md" variant="secondary" onClick={() => onStart(trail)}>
-                <Footprints className="size-4" aria-hidden /> Démarrer quand même
+              <Button size="md" variant="secondary" leftIcon={<Footprints />} onClick={() => onStart(trail)} disabled={Boolean(traceNotice)}>
+                Démarrer quand même
               </Button>
             )}
-            <Button size="md" variant="secondary" onClick={() => navigate("/offline")}>
-              <Download className="size-4" aria-hidden /> Hors connexion
+            <Button size="md" variant="secondary" leftIcon={<Download />} onClick={() => navigate("/offline")}>
+              Hors connexion
             </Button>
-            <Button size="md" variant="ghost" onClick={() => navigate(`/explore?trail=${encodeURIComponent(trail.id)}`)}>
-              <Info className="size-4" aria-hidden /> Voir les détails
+            <Button size="md" variant="ghost" leftIcon={<Info />} onClick={() => navigate(`/explore?trail=${encodeURIComponent(trail.id)}`)}>
+              Voir les détails
             </Button>
           </div>
         </div>

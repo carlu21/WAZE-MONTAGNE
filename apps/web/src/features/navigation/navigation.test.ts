@@ -3,7 +3,7 @@ import { buildRoute, haversineM, projectOnPolyline, type LngLat } from "@mountai
 import { cellBBox, cellKey, cellsAlongRoute, cellsAround } from "./network";
 import { SimulationSource } from "./sources";
 import { headingFromEvent } from "./compass";
-import { describeMatch, qualityLabel } from "./format";
+import { accuracyLabel, qualityLabel, trailLabel } from "./format";
 import { gpxFileName, trackName } from "./tracks";
 import { routeBBox } from "./data";
 import { EMPTY_LIVE, useNavigationStore } from "./store";
@@ -64,8 +64,17 @@ describe("boussole et formats", () => {
     expect(headingFromEvent({ alpha: 90, absolute: false } as never)).toBeNull();
     expect(headingFromEvent({ alpha: null, webkitCompassHeading: 45 } as never)).toBe(45);
   });
-  it("décrit le rattachement et la qualité GPS", () => {
-    expect(describeMatch(null)).toBe("Hors sentier");
+  it("ne dit JAMAIS « Hors sentier » avant d'avoir une position fiable", () => {
+    // Aucun relevé, aucun réseau : la seule phrase permise est l'attente.
+    expect(trailLabel({ output: null, trust: "unavailable", networkSegments: 0, consecutiveOffTrail: 0 })).toBe("Position en cours d'acquisition");
+    expect(trailLabel({ output: null, trust: "acquiring", networkSegments: 40, consecutiveOffTrail: 99 })).toBe("Position en cours d'acquisition");
+    // Position fiable mais réseau absent : on n'affiche rien plutôt que d'accuser.
+    expect(trailLabel({ output: null, trust: "reliable", networkSegments: 0, consecutiveOffTrail: 99 })).toBeNull();
+  });
+
+  it("décrit la qualité GPS et la précision, sans promettre de certitude", () => {
+    expect(accuracyLabel(6)).toBe("GPS ± 6 m");
+    expect(accuracyLabel(null)).toBe("GPS");
     expect(qualityLabel("poor", 60)).toBe("Signal GPS faible");
     expect(qualityLabel("lost", null)).toBe("Signal GPS perdu");
     expect(qualityLabel("good", 8)).toBe("Précision ±8 m");

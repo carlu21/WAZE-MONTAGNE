@@ -9,3 +9,4 @@ export * from "./track";
 export * from "./gpx";
 export * from "./eta";
 export * from "./engine";
+export * from "./truth";

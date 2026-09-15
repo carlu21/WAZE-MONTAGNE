@@ -39,7 +39,12 @@ export const LAYER_IDS = {
   /** Carte de fréquentation (réseau vivant). */
   heatPathsCasing: "ml-heat-paths-casing",
   heatPaths: "ml-heat-paths",
-  /** Écran d'accueil : départs de randonnée, tracé sélectionné, position orientée. */
+  /** Écran d'accueil : chemins réels alentour, départs, tracé sélectionné, position orientée. */
+  homePathsCasing: "ml-home-paths-casing",
+  homePaths: "ml-home-paths",
+  /** Flèche de direction : JAMAIS un itinéraire, seulement un cap indicatif. */
+  homeDirection: "ml-home-direction",
+  navDirection: "ml-nav-direction",
   homeTrailCasing: "ml-home-trail-casing",
   homeTrail: "ml-home-trail",
   homeHeads: "ml-home-heads",
@@ -62,6 +67,9 @@ export const SOURCE_IDS = {
   navTrack: "ml-nav-track",
   navReturn: "ml-nav-return",
   navEvents: "ml-nav-events",
+  homePaths: "ml-home-paths",
+  homeDirection: "ml-home-direction",
+  navDirection: "ml-nav-direction",
   homeTrail: "ml-home-trail",
   homeHeads: "ml-home-heads",
   homeUser: "ml-home-user",
@@ -76,6 +84,8 @@ export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.heatPaths,
   LAYER_IDS.navPathsCasing,
   LAYER_IDS.navPaths,
+  LAYER_IDS.homePathsCasing,
+  LAYER_IDS.homePaths,
   LAYER_IDS.homeTrailCasing,
   LAYER_IDS.homeTrail,
   LAYER_IDS.alertsFill,
@@ -85,6 +95,8 @@ export const LAYER_ORDER: readonly string[] = [
   LAYER_IDS.navRouteDone,
   LAYER_IDS.navTrack,
   LAYER_IDS.navReturn,
+  LAYER_IDS.navDirection,
+  LAYER_IDS.homeDirection,
   LAYER_IDS.reportsBlur,
   LAYER_IDS.reportsClusters,
   LAYER_IDS.reportsClusterCount,

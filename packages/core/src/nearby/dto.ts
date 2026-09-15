@@ -3,6 +3,7 @@
  * au panneau « Randonnées autour de vous ».
  */
 import type { LngLat } from "../geo";
+import type { PathSource } from "../navigation/types";
 import type { NearbySort, NearbyTrail } from "./types";
 
 export interface NearbyRequest {
@@ -31,4 +32,13 @@ export interface TrailGeometryResponse {
   name: string;
   coordinates: LngLat[];
   elevations: number[] | null;
+  /**
+   * Provenance du tracé : `osm`, `ign` ou `gpx` = relevé réel ; `seed` ou
+   * `local` = démonstration ou brouillon. `null` quand elle est inconnue.
+   * L'affichage refuse de présenter comme itinéraire un tracé non relevé
+   * (`routeVerdict`) : une jolie ligne sur des données fictives reste fictive.
+   */
+  source: PathSource | null;
+  /** Longueur annoncée par la fiche (m) : sert à repérer un tracé qui coupe au plus court. */
+  declaredLengthM: number | null;
 }

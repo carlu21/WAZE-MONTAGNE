@@ -21,8 +21,10 @@ export const fr = {
   /** Barre de navigation (section 3). */
   nav: {
     navigate: "Itinéraire",
+    home: "Accueil",
     map: "Carte",
     explore: "Explorer",
+    activities: "Activités",
     report: "Signaler",
     community: "Communauté",
     profile: "Profil",
@@ -387,6 +389,7 @@ export const fr = {
     centerOnMe: "Me localiser",
     filters: "Filtres",
     basemap: "Fond de carte",
+    layers: "Couches",
     legend: "Légende",
     noReports: "Aucun signalement dans cette zone.",
     zoomIn: "Zoomez pour voir les détails",
@@ -508,6 +511,35 @@ export const fr = {
     onKind: "Sur un {kind}",
     offPath: "Hors sentier",
     matchedLow: "Chemin incertain",
+
+    /*
+     * Ce que l'on refuse d'afficher, et pourquoi. Une fonctionnalité annoncée
+     * « bientôt disponible » vaut mieux qu'une fonctionnalité techniquement
+     * fausse : jamais de ligne droite présentée comme itinéraire, jamais de
+     * chemin inventé, jamais « Hors sentier » avec un GPS encore incertain.
+     */
+    unavailable: {
+      title: "Itinéraire indisponible",
+      soon: "Bientôt disponible",
+      noRoute: "Aucun itinéraire pédestre fiable disponible entre ces deux points.",
+      showNearbyPaths: "Afficher les chemins à proximité",
+      noGeometry: "Le tracé de cet itinéraire n'est pas encore disponible.",
+      schematicGeometry: "Le tracé connu relie des points de passage, pas le chemin réel : il ne peut pas être suivi.",
+      notSurveyed: "Ce tracé vient du jeu de démonstration : il ne correspond pas au chemin réel du terrain.",
+      noNetwork: "Aucun chemin connu dans ce secteur : le réseau réel n'y est pas encore importé.",
+      unreachable: "Aucun chemin connu ne relie ces deux points.",
+      searching: "Recherche d'un itinéraire sur les chemins réels…",
+    },
+    /** Un seul message d'état GPS : il disparaît dès que le signal est bon. */
+    gpsAcquiring: "Acquisition GPS…",
+    gpsAcquiringBody: "Votre position apparaîtra lorsque le signal sera suffisamment précis.",
+    positionAcquiring: "Position en cours d'acquisition",
+    /** Écart au sentier : uniquement après plusieurs mesures fiables concordantes. */
+    leftTrail: "Vous semblez avoir quitté le sentier.",
+    /** Étiquette obligatoire de toute ligne droite affichée. */
+    directionOnly: "Direction indicative — ce n'est pas un chemin.",
+    directionTo: "Direction indicative : {direction}, à {distance} à vol d'oiseau — ce n'est pas un chemin.",
+    traceBreak: "Trace interrompue : relevés trop éloignés pour être reliés.",
     stats: {
       remaining: "Restant",
       done: "Parcouru",

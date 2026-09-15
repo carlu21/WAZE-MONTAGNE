@@ -62,7 +62,8 @@ export const router = createBrowserRouter([
       { path: "/profile", element: <S><RequireAuth><ProfilePage /></RequireAuth></S> },
       { path: "/profile/preferences", element: <S><RequireAuth><PreferencesPage /></RequireAuth></S> },
       { path: "/profile/settings", element: <S><RequireAuth><SettingsPage /></RequireAuth></S> },
-      { path: "/profile/activities", element: <S><ActivitiesPage /></S> },
+      { path: "/activities", element: <S><ActivitiesPage /></S> },
+      { path: "/profile/activities", element: <Navigate to="/activities" replace /> },
       { path: "/profile/privacy-zones", element: <S><RequireAuth><PrivacyZonesPage /></RequireAuth></S> },
       { path: "/notifications", element: <S><RequireAuth><NotificationsPage /></RequireAuth></S> },
       { path: "/offline", element: <S><OfflinePage /></S> },
@@ -80,6 +81,5 @@ export const router = createBrowserRouter([
     path: "/pro/*",
     element: <S><RequireRole roles={["official", "partner", "admin"]}><ProDashboardPage /></RequireRole></S>,
   },
-  { path: "/home", element: <Navigate to="/navigate" replace /> },
   { path: "*", element: <S><NotFoundPage /></S> },
 ]);

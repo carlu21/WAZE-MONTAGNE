@@ -23,7 +23,7 @@
  * Les tables correspondantes sont décrites dans docs/DATA_MODEL.md.
  */
 import type { LngLat } from "../geo";
-import type { ActivityMode, PathSegment, TrackPoint } from "../navigation/types";
+import type { ActivityMode, PathSegment, PathSource, TrackPoint } from "../navigation/types";
 
 /* ------------------------------------------------------------------ */
 /* 1. Trace brute et qualité des points (sections 4, 5, 6)             */
@@ -430,6 +430,12 @@ export interface RouteOption {
   criterion: RouteCriterion;
   legs: RouteLeg[];
   coordinates: LngLat[];
+  /**
+   * Provenances des segments empruntés, dédoublonnées. L'affichage s'en sert
+   * pour refuser de présenter comme itinéraire un tracé issu du jeu de
+   * démonstration : un chemin calculé sur des données fictives reste fictif.
+   */
+  sources: PathSource[];
   distanceM: number;
   durationMs: number;
   elevationGainM: number;

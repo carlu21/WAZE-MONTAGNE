@@ -71,7 +71,7 @@ import type { LatLng } from "../types";
 import { haversineM, type LngLat } from "../geo";
 import { DEFAULT_SPEED_MS } from "../navigation/eta";
 import { isSegmentAllowed, nodeKey, nodePosition } from "../navigation/graph";
-import { ACTIVITY_MODES, type ActivityMode, type PathKind } from "../navigation/types";
+import { ACTIVITY_MODES, type ActivityMode, type PathKind, type PathSource } from "../navigation/types";
 import { TIME_CONFIDENCE_RANK, estimateTime, segmentProfile, theoreticalTimeMs, timeConfidence } from "./timing";
 import {
   K_ANONYMITY_MIN,
@@ -977,9 +977,11 @@ function buildOption(
   let popularitySimple = 0;
   let observedSimple = 0;
   let passages30d = Infinity;
+  const sources = new Set<PathSource>();
 
   for (const edge of edges) {
     const input = graph.segments.get(edge.segmentId);
+    if (input !== undefined) sources.add(input.segment.source);
     const estimate = edge.durations[activity];
     const legDistance = edge.distanceM;
     legs.push({
@@ -1017,6 +1019,7 @@ function buildOption(
     criterion,
     legs,
     coordinates: concatCoordinates(graph, edges),
+    sources: [...sources],
     distanceM: Math.round(distanceM),
     durationMs: Math.round(durationMs),
     elevationGainM: Math.round(elevationGainM),

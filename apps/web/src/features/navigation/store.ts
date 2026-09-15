@@ -52,6 +52,18 @@ export interface NavLive {
   networkSegments: number;
   /** Chargement du réseau en cours. */
   loadingNetwork: boolean;
+  /**
+   * Nombre de relevés reçus depuis le début de la session. En dessous de
+   * `TRUST_MIN_FIXES`, la position n'est pas encore acquise : on affiche
+   * « Acquisition GPS… » et on ne conclut RIEN sur le sentier.
+   */
+  fixes: number;
+  /**
+   * Relevés successifs au-delà de la tolérance de sentier. Plusieurs mesures
+   * concordantes sont exigées avant d'oser « Vous semblez avoir quitté le
+   * sentier. » — un relevé isolé ne prouve rien.
+   */
+  consecutiveOffTrail: number;
 }
 
 export const EMPTY_LIVE: NavLive = {
@@ -73,6 +85,8 @@ export const EMPTY_LIVE: NavLive = {
   lastAlert: null,
   networkSegments: 0,
   loadingNetwork: false,
+  fixes: 0,
+  consecutiveOffTrail: 0,
 };
 
 export interface NavSession {

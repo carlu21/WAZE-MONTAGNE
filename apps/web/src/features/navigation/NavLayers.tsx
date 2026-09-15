@@ -1,15 +1,22 @@
 /**
- * Couches de la carte de navigation (sections 5, 9, 19, 20) :
- *  - réseau de chemins chargé (trait fin), itinéraire (portion faite / restante),
- *  - fil d'Ariane (trace parcourue), ligne de retour au parcours,
- *  - événements devant soi (marqueurs de la taxonomie),
- *  - marqueur utilisateur orienté (flèche tournée selon le cap) avec cercle
- *    d'incertitude GPS ; la position est interpolée entre deux relevés pour
- *    éviter les sauts (section 22).
+ * Couches de la carte de navigation (sections 5, 9, 19, 20).
+ *
+ * Trois objets distincts, et ils ne se confondent jamais :
+ *
+ *   A. LA POSITION — marqueur orienté, cercle d'incertitude. Rien d'autre.
+ *   B. LA TRACE PARCOURUE — les relevés réellement enregistrés, dans l'ordre,
+ *      DÉCOUPÉE (`drawableTraceSegments`) là où deux relevés ne peuvent pas se
+ *      suivre : on interrompt le trait plutôt que de le rafistoler en ligne droite.
+ *   C. L'ITINÉRAIRE À SUIVRE — et seulement s'il suit le réseau réel. Un tracé
+ *      schématique n'est pas dessiné du tout (`routeDrawable`).
+ *
+ * La seule ligne droite tolérée est la FLÈCHE DE DIRECTION vers le parcours :
+ * grise, pointillée, bornée à quelques dizaines de mètres, et annoncée comme
+ * telle dans l'affichage tête haute. Elle ne se suit pas, elle oriente.
  */
 import { useEffect, useMemo, useRef } from "react";
 import type { Map as MaplibreMap } from "maplibre-gl";
-import { sliceAlong, type LatLng, type NavRoute, type RouteEvent, type TrackPoint } from "@mountain-live/core";
+import { directionIndicator, drawableTraceSegments, sliceAlong, type LatLng, type NavRoute, type RouteEvent, type TrackPoint } from "@mountain-live/core";
 import { isMapAlive, useMap, useMapLayers } from "@/components/map/MapView";
 import { LAYER_IDS, SOURCE_IDS, addLayerOrdered, geoJsonSource, removeLayerSafe, removeSourceSafe } from "@/components/map/layers";
 import { categoryMarkerImageId, ensureImage, markerImageId } from "@/components/map/markers";
@@ -21,7 +28,8 @@ import { currentTrack, networkGraphSnapshot } from "./useNavigationEngine";
 const ROUTE_COLOR = "#1D6FA5";
 const DONE_COLOR = "#7A8894";
 const TRACK_COLOR = "#E8730C";
-const RETURN_COLOR = "#C8341F";
+/** Gris ardoise : la flèche de direction. Jamais la couleur d'un itinéraire. */
+const DIRECTION_COLOR = "#5B6670";
 const PATH_COLOR = "#8B5E3C";
 const ARROW_IMAGE = "ml-nav-arrow";
 const DOT_IMAGE = "ml-nav-dot";
@@ -58,11 +66,16 @@ function eventsCollection(events: readonly RouteEvent[], along: number | null): 
 
 export interface NavLayersProps {
   route: NavRoute | null;
-  /** Cible de la ligne de retour au parcours (sortie d'itinéraire), ou null. */
+  /**
+   * L'itinéraire suit-il un réseau réel ? Faux = on ne dessine AUCUNE ligne
+   * d'itinéraire, quoi qu'il arrive.
+   */
+  routeDrawable?: boolean;
+  /** Cible de la flèche de direction vers le parcours (sortie d'itinéraire), ou null. */
   returnTarget: LatLng | null;
 }
 
-export function NavLayers({ route, returnTarget }: NavLayersProps) {
+export function NavLayers({ route, routeDrawable = true, returnTarget }: NavLayersProps) {
   const { map, ready, styleVersion } = useMap();
   const live = useNavigationStore((s) => s.live);
   const networkSegments = live.networkSegments;
@@ -91,12 +104,12 @@ export function NavLayers({ route, returnTarget }: NavLayersProps) {
       if (!m.getSource(id)) m.addSource(id, { type: "geojson", data: EMPTY_COLLECTION });
     }
     addLayerOrdered(m, { id: LAYER_IDS.navPathsCasing, type: "line", source: SOURCE_IDS.navPaths, minzoom: 11, paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 5], "line-opacity": 0.6 }, layout: { "line-cap": "round", "line-join": "round" } });
-    addLayerOrdered(m, { id: LAYER_IDS.navPaths, type: "line", source: SOURCE_IDS.navPaths, minzoom: 11, paint: { "line-color": ["case", ["==", ["get", "kind"], "track"], "#A0522D", PATH_COLOR], "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 16, 2.2], "line-opacity": 0.85, "line-dasharray": ["case", ["==", ["get", "kind"], "track"], ["literal", [1, 0]], ["literal", [2, 1.5]]] }, layout: { "line-cap": "round", "line-join": "round" } });
+    addLayerOrdered(m, { id: LAYER_IDS.navPaths, type: "line", source: SOURCE_IDS.navPaths, minzoom: 11, paint: { "line-color": ["case", ["==", ["get", "kind"], "track"], "#A0522D", PATH_COLOR], "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 16, 2.2], "line-opacity": ["case", ["==", ["get", "surveyed"], true], 0.85, 0.4], "line-dasharray": ["case", ["==", ["get", "surveyed"], true], ["literal", [2, 1.5]], ["literal", [1.5, 2.5]]] }, layout: { "line-cap": "round", "line-join": "round" } });
     addLayerOrdered(m, { id: LAYER_IDS.navRouteCasing, type: "line", source: SOURCE_IDS.navRoute, paint: { "line-color": "#FFFFFF", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 16, 11], "line-opacity": 0.9 }, layout: { "line-cap": "round", "line-join": "round" } });
     addLayerOrdered(m, { id: LAYER_IDS.navRouteRemaining, type: "line", source: SOURCE_IDS.navRoute, filter: ["==", ["get", "part"], "remaining"], paint: { "line-color": ROUTE_COLOR, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 7] }, layout: { "line-cap": "round", "line-join": "round" } });
     addLayerOrdered(m, { id: LAYER_IDS.navRouteDone, type: "line", source: SOURCE_IDS.navRoute, filter: ["==", ["get", "part"], "done"], paint: { "line-color": DONE_COLOR, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 7], "line-opacity": 0.85 }, layout: { "line-cap": "round", "line-join": "round" } });
     addLayerOrdered(m, { id: LAYER_IDS.navTrack, type: "line", source: SOURCE_IDS.navTrack, paint: { "line-color": TRACK_COLOR, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 2, 16, 4], "line-dasharray": [1.5, 1.5], "line-opacity": 0.95 }, layout: { "line-cap": "round", "line-join": "round" } });
-    addLayerOrdered(m, { id: LAYER_IDS.navReturn, type: "line", source: SOURCE_IDS.navReturn, paint: { "line-color": RETURN_COLOR, "line-width": 3, "line-dasharray": [1, 2] }, layout: { "line-cap": "round" } });
+    addLayerOrdered(m, { id: LAYER_IDS.navReturn, type: "line", source: SOURCE_IDS.navReturn, paint: { "line-color": DIRECTION_COLOR, "line-width": 3, "line-dasharray": [1, 1.6], "line-opacity": 0.85 }, layout: { "line-cap": "round" } });
     addLayerOrdered(m, { id: LAYER_IDS.navEvents, type: "symbol", source: SOURCE_IDS.navEvents, layout: { "icon-image": ["get", "markerImage"], "icon-anchor": "bottom", "icon-allow-overlap": true, "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 15, 1] } });
     addLayerOrdered(m, { id: LAYER_IDS.navAccuracy, type: "fill", source: SOURCE_IDS.navUser, filter: ["==", ["get", "kind"], "accuracy"], paint: { "fill-color": ROUTE_COLOR, "fill-opacity": 0.12, "fill-outline-color": ROUTE_COLOR } });
     addLayerOrdered(m, { id: LAYER_IDS.navMarkerHalo, type: "circle", source: SOURCE_IDS.navUser, filter: ["==", ["get", "kind"], "marker"], paint: { "circle-radius": 22, "circle-color": ROUTE_COLOR, "circle-opacity": ["case", ["==", ["get", "lost"], true], 0.08, 0.18], "circle-pitch-alignment": "map" } });
@@ -116,9 +129,9 @@ export function NavLayers({ route, returnTarget }: NavLayersProps) {
     src.setData(networkSegments > 0 ? (networkGraphSnapshot() as FeatureCollection) : EMPTY_COLLECTION);
   }, [map, ready, styleVersion, networkSegments]);
 
-  // Itinéraire : portion faite / restante.
+  // Itinéraire : portion faite / restante. Rien du tout s'il ne suit pas le réseau réel.
   const routeData = useMemo<FeatureCollection>(() => {
-    if (!route) return EMPTY_COLLECTION;
+    if (!route || !routeDrawable) return EMPTY_COLLECTION;
     const along = progress?.along ?? 0;
     const done = along > 5 ? sliceAlong(route.coordinates, route.cumulative, 0, along) : [];
     const remaining = sliceAlong(route.coordinates, route.cumulative, along, route.lengthM);
@@ -126,27 +139,47 @@ export function NavLayers({ route, returnTarget }: NavLayersProps) {
       type: "FeatureCollection",
       features: [...lineCollection(done, { part: "done" }).features, ...lineCollection(remaining, { part: "remaining" }).features],
     };
-  }, [route, progress?.along]);
+  }, [route, routeDrawable, progress?.along]);
   useEffect(() => {
     if (!map || !ready || !isMapAlive(map)) return;
     geoJsonSource(map, SOURCE_IDS.navRoute)?.setData(routeData);
   }, [map, ready, styleVersion, routeData]);
 
-  // Fil d'Ariane.
+  /*
+   * Fil d'Ariane — la trace RÉELLEMENT parcourue, découpée en tronçons continus.
+   * Une reprise de signal après un tunnel, une mise en veille ou un saut de
+   * relevé n'est pas un déplacement : le trait s'interrompt, et c'est la
+   * lecture honnête. Le dernier point se prolonge jusqu'à la position courante
+   * uniquement si cette position appartient bien au dernier tronçon.
+   */
   useEffect(() => {
     if (!map || !ready || !isMapAlive(map)) return;
     const pts: TrackPoint[] = currentTrack();
-    const coords = pts.map((p) => [p.lng, p.lat] as [number, number]);
-    if (output && coords.length > 0) coords.push([output.position.lng, output.position.lat]);
-    geoJsonSource(map, SOURCE_IDS.navTrack)?.setData(lineCollection(coords));
+    const segments = drawableTraceSegments(
+      output && pts.length > 0
+        ? [...pts, { lat: output.position.lat, lng: output.position.lng, alt: null, at: output.at, accuracy: output.accuracy }]
+        : pts,
+    );
+    geoJsonSource(map, SOURCE_IDS.navTrack)?.setData({
+      type: "FeatureCollection",
+      features: segments.flatMap((coords) => lineCollection(coords).features),
+    });
   }, [map, ready, styleVersion, trackPoints, output]);
 
-  // Ligne de retour au parcours.
+  /*
+   * Flèche vers le parcours : une DIRECTION, pas un chemin. Bornée à quelques
+   * dizaines de mètres (`directionIndicator`) précisément pour qu'on ne puisse
+   * pas la prendre pour un itinéraire à suivre à travers la pente.
+   */
   useEffect(() => {
     if (!map || !ready || !isMapAlive(map)) return;
     const src = geoJsonSource(map, SOURCE_IDS.navReturn);
     if (!src) return;
-    src.setData(returnTarget && output ? lineCollection([[output.position.lng, output.position.lat], [returnTarget.lng, returnTarget.lat]]) : EMPTY_COLLECTION);
+    src.setData(
+      returnTarget && output
+        ? lineCollection(directionIndicator(output.position, returnTarget).coordinates)
+        : EMPTY_COLLECTION,
+    );
   }, [map, ready, styleVersion, returnTarget, output]);
 
   // Événements.

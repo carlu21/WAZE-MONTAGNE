@@ -1,9 +1,13 @@
 /**
  * Coquille applicative (sections 3, 20 et 31).
  *
- * - Contenu plein écran (la carte peut occuper 100 % de la zone de contenu).
- * - Mobile : barre de navigation basse à 5 entrées (Itinéraire, Carte, Signaler,
- *   Explorer, Profil) avec le bouton flottant central « + Signaler ».
+ * - Contenu plein écran (la carte occupe 100 % de la zone de contenu sur l'Accueil).
+ * - QUATRE entrées, et quatre seulement : Accueil · Explorer · Activités · Profil.
+ *   L'ACCUEIL EST LA CARTE — il n'y a donc pas d'onglet « Carte » à côté : deux
+ *   entrées pour la même expérience, c'est une hésitation, pas une navigation.
+ *   « Signaler » n'est pas un onglet : c'est une ACTION, et elle vit en bouton
+ *   flottant sur la carte de l'Accueil et pendant l'activité, là où on la
+ *   déclenche vraiment.
  * - Écran ≥ 1024 px : les mêmes entrées dans une barre latérale gauche.
  * - Expose l'encombrement de la coquille aux surcouches fixes (feuille basse,
  *   toasts) via --shell-bottom / --shell-left sur <html>.
@@ -12,7 +16,7 @@
 import { useLayoutEffect, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Compass, Map as MapIcon, Navigation2, UserRound } from "lucide-react";
+import { Compass, Footprints, Navigation2, UserRound } from "lucide-react";
 import { fr } from "@mountain-live/core";
 import type { LucideProps } from "lucide-react";
 import { OfflineBanner } from "@/features/offline/OfflineBanner";
@@ -22,12 +26,12 @@ import { qk } from "@/lib/queryKeys";
 import { formatBadgeCount } from "@/lib/format";
 import { useApplyTheme } from "@/lib/theme";
 import { useIsAuthenticated } from "@/store/session";
+import { useNavigationStore } from "@/features/navigation/store";
 import { cn } from "@/components/ui/cn";
-import { Fab } from "@/components/ui/Button";
 import { useIsDesktop } from "@/components/ui/hooks";
 
 export interface NavEntry {
-  key: "home" | "map" | "explore" | "profile";
+  key: "home" | "explore" | "activities" | "profile";
   to: string;
   label: string;
   icon: ComponentType<LucideProps>;
@@ -36,14 +40,19 @@ export interface NavEntry {
 }
 
 /**
- * Les quatre entrées de navigation ; « Signaler » est le bouton flottant central.
- * « Accueil » est LA carte : l'application s'ouvre dessus, avec la position et les
- * randonnées alentour. La communauté est accessible depuis Explorer et Profil.
+ * Les quatre entrées, et leurs icônes — choisies pour Mountain Live, pas
+ * reprises d'ailleurs :
+ *
+ *   Accueil    ▲ flèche de position : on est SUR la carte, orienté, en montagne
+ *                (pas une maison : l'accueil n'est pas un salon, c'est le terrain)
+ *   Explorer   ✦ boussole : on cherche où aller
+ *   Activités  👣 empreintes : ce que l'on a réellement parcouru
+ *   Profil     ◍ compte, préférences, contributions
  */
 export const NAV_ENTRIES: readonly NavEntry[] = [
-  { key: "home", to: "/home", label: "Accueil", icon: Navigation2, matches: ["/home", "/navigate"] },
-  { key: "map", to: "/map", label: fr.nav.map, icon: MapIcon, matches: ["/map", "/around", "/reports"] },
+  { key: "home", to: "/home", label: fr.nav.home, icon: Navigation2, matches: ["/home", "/navigate", "/map", "/around", "/reports"] },
   { key: "explore", to: "/explore", label: fr.nav.explore, icon: Compass, matches: ["/explore", "/community"] },
+  { key: "activities", to: "/activities", label: fr.nav.activities, icon: Footprints, matches: ["/activities"] },
   { key: "profile", to: "/profile", label: fr.nav.profile, icon: UserRound, matches: ["/profile", "/notifications", "/offline"] },
 ];
 
@@ -104,81 +113,42 @@ function NavItem({ entry, active, badge = 0, layout }: NavItemProps) {
   );
 }
 
-/**
- * Écrans qui portent DÉJÀ leur propre bouton « Signaler », posé sur la carte à
- * portée de pouce. La barre y renonce au sien : deux boutons identiques sur le
- * même écran, c'est la surcharge qu'on cherche à éviter.
- */
-export const ROUTES_WITH_OWN_REPORT: readonly string[] = ["/home"];
-
-export function ownsReportAction(pathname: string): boolean {
-  return ROUTES_WITH_OWN_REPORT.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
 function BottomNav({ pathname, unread }: { pathname: string; unread: number }) {
-  const [navigateEntry, map, explore, profile] = NAV_ENTRIES;
-  const ownReport = ownsReportAction(pathname);
   return (
     <nav
       aria-label="Navigation principale"
       className="glass-strong relative z-[var(--z-nav)] shrink-0 border-t border-line"
       style={{ paddingBottom: "var(--safe-bottom)" }}
     >
-      <ul className={cn("mx-auto grid h-[var(--nav-height)] max-w-2xl items-stretch px-1", ownReport ? "grid-cols-4" : "grid-cols-5")}>
-        <li>
-          <NavItem entry={navigateEntry} active={isNavActive(navigateEntry, pathname)} layout="bottom" />
-        </li>
-        <li>
-          <NavItem entry={map} active={isNavActive(map, pathname)} layout="bottom" />
-        </li>
-        {!ownReport && (
-        <li className="relative flex flex-col items-center justify-end pb-1.5">
-          <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[22px]">
-            <Fab to={REPORT_PATH} label={fr.nav.report} />
-          </span>
-          <span className="text-[11px] font-semibold leading-none text-accent" aria-hidden="true">
-            {fr.nav.report}
-          </span>
-        </li>
-        )}
-        <li>
-          <NavItem entry={explore} active={isNavActive(explore, pathname)} layout="bottom" />
-        </li>
-        <li>
-          <NavItem entry={profile} active={isNavActive(profile, pathname)} badge={unread} layout="bottom" />
-        </li>
+      {/* Quatre colonnes, pas de bouton central : « Signaler » est une action de
+          la carte, pas une destination. */}
+      <ul className="mx-auto grid h-[var(--nav-height)] max-w-2xl grid-cols-4 items-stretch px-1">
+        {NAV_ENTRIES.map((entry) => (
+          <li key={entry.key}>
+            <NavItem entry={entry} active={isNavActive(entry, pathname)} badge={entry.key === "profile" ? unread : 0} layout="bottom" />
+          </li>
+        ))}
       </ul>
     </nav>
   );
 }
 
 function SideNav({ pathname, unread }: { pathname: string; unread: number }) {
-  const [navigateEntry, map, explore, profile] = NAV_ENTRIES;
-  const item = (entry: NavEntry, badge?: number) => (
-    <li key={entry.key}>
-      <NavItem entry={entry} active={isNavActive(entry, pathname)} badge={badge} layout="side" />
-    </li>
-  );
   return (
     <nav
       aria-label="Navigation principale"
       className="glass-strong relative z-[var(--z-nav)] flex w-[var(--sidebar-width)] shrink-0 flex-col items-center border-r border-line"
       style={{ paddingTop: "calc(var(--safe-top) + 12px)", paddingBottom: "calc(var(--safe-bottom) + 12px)" }}
     >
-      <Link to="/home" className="mb-4 inline-flex size-12 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40" aria-label={`${fr.appName} — ${fr.nav.map}`}>
+      <Link to="/home" className="mb-4 inline-flex size-12 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/40" aria-label={`${fr.appName} — ${fr.nav.home}`}>
         <img src="/icons/icon.svg" alt="" width={40} height={40} className="size-10 rounded-lg" />
       </Link>
       <ul className="flex flex-col items-center gap-1">
-        {item(navigateEntry)}
-        {item(map)}
-        <li className="my-2 flex flex-col items-center gap-1.5">
-          <Fab to={REPORT_PATH} label={fr.nav.report} />
-          <span className="text-[11px] font-semibold leading-none text-accent" aria-hidden="true">
-            {fr.nav.report}
-          </span>
-        </li>
-        {item(explore)}
-        {item(profile, unread)}
+        {NAV_ENTRIES.map((entry) => (
+          <li key={entry.key}>
+            <NavItem entry={entry} active={isNavActive(entry, pathname)} badge={entry.key === "profile" ? unread : 0} layout="side" />
+          </li>
+        ))}
       </ul>
     </nav>
   );
@@ -193,31 +163,38 @@ export function AppShell({ children }: AppShellProps) {
   const isDesktop = useIsDesktop();
   const { pathname } = useLocation();
   const unread = useUnreadCount();
+  /*
+   * MODE ACTIVITÉ : pendant une sortie, la barre disparaît pour de bon — elle
+   * n'est pas seulement recouverte. Deux modes, jamais mélangés : on explore,
+   * ou on marche. Changer d'onglet au milieu d'une randonnée n'a pas de sens,
+   * et un onglet à moitié visible sous le panneau de statistiques encore moins.
+   */
+  const inActivity = useNavigationStore((s) => s.status === "running" || s.status === "paused");
 
   // Encombrement de la coquille pour les surcouches fixes (feuille basse, toasts).
   useLayoutEffect(() => {
     const root = document.documentElement.style;
-    root.setProperty("--shell-bottom", isDesktop ? "var(--safe-bottom)" : "calc(var(--nav-height) + var(--safe-bottom))");
+    root.setProperty("--shell-bottom", isDesktop || inActivity ? "var(--safe-bottom)" : "calc(var(--nav-height) + var(--safe-bottom))");
     root.setProperty("--shell-left", isDesktop ? "var(--sidebar-width)" : "0px");
     return () => {
       root.removeProperty("--shell-bottom");
       root.removeProperty("--shell-left");
     };
-  }, [isDesktop]);
+  }, [isDesktop, inActivity]);
 
   return (
     <div className={cn("flex h-full w-full bg-bg", isDesktop ? "flex-row" : "flex-col")} data-shell={isDesktop ? "desktop" : "mobile"}>
       <a href="#main" className="skip-link">
         Aller au contenu
       </a>
-      {isDesktop ? <SideNav pathname={pathname} unread={unread} /> : null}
+      {isDesktop && !inActivity ? <SideNav pathname={pathname} unread={unread} /> : null}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <OfflineBanner />
         <main id="main" className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" tabIndex={-1}>
           {children}
         </main>
       </div>
-      {!isDesktop ? <BottomNav pathname={pathname} unread={unread} /> : null}
+      {!isDesktop && !inActivity ? <BottomNav pathname={pathname} unread={unread} /> : null}
       <AlertsWatcher />
     </div>
   );

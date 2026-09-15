@@ -24,17 +24,25 @@
  * lui-même ; dès qu'il la déplace, le bouton « recentrer » s'impose.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Layers, LocateFixed, TriangleAlert } from "lucide-react";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import {
+  bboxFromCenter,
   buildRoute,
+  compassLabel,
+  directionIndicator,
+  formatDistance,
   fr,
+  interpolate,
+  routeVerdict,
   type ActivityMode,
   type Basemap,
   type BBox,
+  type LngLat,
   type NearbySort,
   type NearbyTrail,
+  type RouteRefusal,
 } from "@mountain-live/core";
 import { useQuery } from "@tanstack/react-query";
 import { Fab, IconButton, Segmented, cn, toast, type SheetSnap } from "@/components/ui";
@@ -52,9 +60,24 @@ import { TrailPreviewSheet } from "@/features/home/TrailPreviewSheet";
 import { useNearby } from "@/features/home/useNearby";
 import { fitZoomFor } from "@/features/home/format";
 import { useNavigationStore } from "@/features/navigation/store";
+import { planOnRealNetwork, refusalMessage } from "@/features/navigation/planner";
 
 /** Zoom du premier centrage sur la position : on voit le vallon, pas le pays. */
 export const HOME_ZOOM = 14;
+/** Emprise des « chemins à proximité » affichés à la demande (m). */
+const NEARBY_PATHS_RADIUS_M = 4000;
+
+/**
+ * Ce que l'écran a le droit de proposer pour la randonnée sélectionnée.
+ * `refusal` non nul = on n'affiche AUCUNE ligne et on explique pourquoi.
+ */
+export interface HomeNotice {
+  refusal: RouteRefusal;
+  message: string;
+  note: string | null;
+  /** Cap et distance à vol d'oiseau, mis en phrase. `null` si la position manque. */
+  direction: string | null;
+}
 
 const BASEMAPS: { value: Basemap; label: string }[] = [
   { value: "topo", label: "Topo" },
@@ -64,6 +87,7 @@ const BASEMAPS: { value: Basemap; label: string }[] = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const mapRef = useRef<MaplibreMap | null>(null);
 
   const position = useUiStore((s) => s.position);
@@ -82,6 +106,12 @@ export default function HomePage() {
   const [viewBBox, setViewBBox] = useState<BBox | null>(null);
   const [zoom, setZoom] = useState(HOME_ZOOM);
   const firstLocate = useRef(false);
+  /** Refus en cours (aucun itinéraire fiable) : la carte reste muette, la fiche parle. */
+  const [notice, setNotice] = useState<HomeNotice | null>(null);
+  const [planning, setPlanning] = useState(false);
+  /** Flèche de cap indicatif vers le départ — bornée, grise, jamais un chemin. */
+  const [direction, setDirection] = useState<LngLat[] | null>(null);
+  const [showPaths, setShowPaths] = useState(false);
 
   const geolocation = useGeolocation();
   const heading = useCompass(true);
@@ -101,6 +131,22 @@ export default function HomePage() {
     queryFn: () => api.trailGeometry(selectedId as string),
     enabled: selectedId !== null,
     staleTime: 30 * 60_000,
+  });
+
+  /**
+   * « Afficher les chemins à proximité » : les segments RÉELS du secteur, tels
+   * que la base les connaît. Ceux qui ne viennent pas d'un relevé sont
+   * dessinés en pointillé pâle — ils ne se donnent pas pour ce qu'ils ne sont pas.
+   */
+  const pathsBBox = useMemo(
+    () => (showPaths && position ? bboxFromCenter({ lat: position.lat, lng: position.lng }, NEARBY_PATHS_RADIUS_M) : null),
+    [showPaths, position?.lat, position?.lng],
+  );
+  const nearbyPaths = useQuery({
+    queryKey: qk.paths(pathsBBox ? `${pathsBBox.west.toFixed(3)},${pathsBBox.south.toFixed(3)}` : ""),
+    queryFn: () => api.paths(pathsBBox as BBox),
+    enabled: pathsBBox !== null,
+    staleTime: 10 * 60_000,
   });
 
   /** Recentre sur la position et reprend le suivi. */
@@ -175,11 +221,48 @@ export default function HomePage() {
     );
   }, [geometry.data]);
 
+  /**
+   * A-t-on le droit de DESSINER ce tracé et de le faire suivre ? Un tracé
+   * schématique (points de passage espacés de kilomètres) ou issu du jeu de
+   * démonstration est refusé : on ne trace pas une ligne droite à travers la
+   * montagne pour faire joli.
+   */
+  const geometryVerdict = useMemo(() => {
+    const g = geometry.data;
+    if (!g) return null;
+    return routeVerdict({ coordinates: g.coordinates, source: g.source, declaredLengthM: g.declaredLengthM });
+  }, [geometry.data]);
+
+  /*
+   * Randonnée choisie depuis EXPLORER : on la sélectionne ici, sur la carte —
+   * Explorer trie et propose, l'Accueil montre et lance. L'état de navigation
+   * est consommé une fois pour ne pas rouvrir la fiche à chaque retour.
+   */
+  useEffect(() => {
+    const state = location.state as { selectTrail?: string } | null;
+    const id = state?.selectTrail;
+    if (!id || trails.length === 0) return;
+    selectTrail(id);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, trails.length, selectTrail, navigate]);
+
+  // Changer de randonnée efface le refus et la flèche de la précédente.
+  useEffect(() => {
+    setNotice(null);
+    setDirection(null);
+  }, [selectedId]);
+
   const startTrail = useCallback(
     (trail: NearbyTrail) => {
       const coords = geometry.data?.coordinates;
       if (!coords || coords.length < 2) {
         toast.info("Tracé en cours de chargement…");
+        return;
+      }
+      // Le refus est une réponse : on ne démarre pas un guidage sur un tracé faux.
+      if (geometryVerdict && !geometryVerdict.drawable) {
+        const refusal = geometryVerdict.refusal ?? "no_geometry";
+        setNotice({ refusal, message: fr.navigation.unavailable.title, note: refusalMessage(refusal), direction: null });
         return;
       }
       const route = buildRoute({
@@ -192,16 +275,53 @@ export default function HomePage() {
       useNavigationStore.getState().start({ mode: "route", route, originalRoute: null, simulate: false });
       navigate("/navigate");
     },
-    [geometry.data, navigate],
+    [geometry.data, geometryVerdict, navigate],
   );
 
+  /**
+   * « Me guider vers le départ » — un itinéraire à part entière, donc calculé
+   * sur le RÉSEAU RÉEL (A* côté serveur), jamais tracé en reliant ma position
+   * au départ par une ligne droite. Quand le moteur ne trouve rien, on le dit
+   * et on propose deux choses honnêtes : voir les chemins du secteur, et un cap
+   * indicatif borné — qui n'est pas un chemin, et l'annonce.
+   */
   const guideToStart = useCallback(
-    (trail: NearbyTrail) => {
-      // Rejoindre le départ est un itinéraire à part entière : le planificateur
-      // du réseau sait le calculer depuis la position réelle.
-      navigate("/navigate", { state: { planTo: trail.trailhead.point, planLabel: trail.name } });
+    async (trail: NearbyTrail) => {
+      if (!position) {
+        setNotice({ refusal: "no_geometry", message: fr.navigation.gpsAcquiring, note: fr.navigation.gpsAcquiringBody, direction: null });
+        return;
+      }
+      setPlanning(true);
+      setNotice(null);
+      setDirection(null);
+      try {
+        const result = await planOnRealNetwork({
+          from: { lat: position.lat, lng: position.lng },
+          to: trail.trailhead.point,
+          activity: activityPref,
+          name: `Départ — ${trail.name}`,
+        });
+        if (result.status === "ok") {
+          useNavigationStore.getState().start({ mode: "route", route: result.route, originalRoute: null, simulate: false });
+          navigate("/navigate");
+          return;
+        }
+        const indicator = directionIndicator({ lat: position.lat, lng: position.lng }, trail.trailhead.point);
+        setNotice({
+          refusal: result.refusal,
+          message: result.message,
+          note: result.note,
+          direction: interpolate(fr.navigation.directionTo, {
+            direction: compassLabel(indicator.bearing),
+            distance: formatDistance(indicator.distanceM),
+          }),
+        });
+        setDirection(indicator.coordinates);
+      } finally {
+        setPlanning(false);
+      }
     },
-    [navigate],
+    [position, activityPref, navigate],
   );
 
   const closePreview = useCallback(() => {
@@ -240,6 +360,9 @@ export default function HomePage() {
           trails={trails}
           selectedId={selectedId}
           selectedGeometry={geometry.data?.coordinates ?? null}
+          geometryDrawable={geometryVerdict?.drawable ?? false}
+          nearbyPaths={showPaths ? (nearbyPaths.data?.paths ?? null) : null}
+          direction={direction}
           heading={heading}
           onSelectTrail={selectTrail}
         />
@@ -304,7 +427,7 @@ export default function HomePage() {
         hasPosition={nearby.hasPosition}
         selectedId={selectedId}
         onSelectTrail={selectTrail}
-        onSearch={() => navigate("/map", { state: { openSearch: true } })}
+        onSearch={() => navigate("/explore")}
         onLocate={recenter}
         sort={sort}
         onSortChange={setSort}
@@ -314,7 +437,17 @@ export default function HomePage() {
         onDurationChange={setDuration}
       />
 
-      <TrailPreviewSheet trail={selected} onClose={closePreview} onStart={startTrail} onGuideToStart={guideToStart} />
+      <TrailPreviewSheet
+        trail={selected}
+        onClose={closePreview}
+        onStart={startTrail}
+        onGuideToStart={(t) => void guideToStart(t)}
+        planning={planning}
+        notice={notice}
+        traceNotice={geometryVerdict && !geometryVerdict.drawable ? refusalMessage(geometryVerdict.refusal ?? "no_geometry") : null}
+        pathsShown={showPaths}
+        onShowNearbyPaths={() => setShowPaths((v) => !v)}
+      />
     </div>
   );
 }
